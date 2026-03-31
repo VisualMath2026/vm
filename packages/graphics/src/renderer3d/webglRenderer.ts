@@ -1,4 +1,4 @@
-export interface WebGLMesh {
+﻿export interface WebGLMesh {
   id: string;
   vertices: Float32Array;
   indices: Uint16Array;
@@ -38,7 +38,8 @@ export class WebGLRenderer {
     this.program = program;
   }
 
-  render(_mesh: WebGLMesh) {
+  render(mesh: WebGLMesh) {
+    void mesh;
     if (!this.program) {
       throw new Error("Renderer is not initialized");
     }
