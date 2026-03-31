@@ -1,0 +1,13 @@
+@'
+node_modules
+.pnpm-store
+.expo
+dist
+coverage
+.env
+.env.*
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+'@ | Set-Content -Path ".gitignore" -Encoding UTF8

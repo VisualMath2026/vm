@@ -1,0 +1,21 @@
+@'
+{
+  "expo": {
+    "name": "VisualMath",
+    "slug": "visualmath-mobile",
+    "scheme": "visualmath",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.visualmath.mobile"
+    }
+  }
+}
+'@ | Set-Content -Path "apps\mobile\app.json" -Encoding UTF8
