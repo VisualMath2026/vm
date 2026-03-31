@@ -1,4 +1,4 @@
-﻿import type { SessionState } from "../dto/types";
+import type { SessionState } from "../dto/types";
 
 export type WsEvent =
   | { type: "HELLO"; payload: { ts: string } }

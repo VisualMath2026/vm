@@ -1,4 +1,4 @@
-﻿export interface WebGLMesh {
+export interface WebGLMesh {
   id: string;
   vertices: Float32Array;
   indices: Uint16Array;
@@ -48,8 +48,6 @@ export class WebGLRenderer {
     gl.clearColor(1, 1, 1, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.useProgram(this.program);
-
-    // TODO: VAO / VBO / IBO and gl.drawElements(...)
   }
 
   private compile(type: number, src: string): WebGLShader {

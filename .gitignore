@@ -1,4 +1,3 @@
-@'
 node_modules
 .pnpm-store
 .expo
@@ -10,4 +9,3 @@ coverage
 Thumbs.db
 .vscode
 .idea
-'@ | Set-Content -Path ".gitignore" -Encoding UTF8

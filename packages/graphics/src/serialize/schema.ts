@@ -1,4 +1,4 @@
-﻿export interface SceneSnapshotV1 {
+export interface SceneSnapshotV1 {
   schemaVersion: 1;
   camera: {
     origin: { x: number; y: number };

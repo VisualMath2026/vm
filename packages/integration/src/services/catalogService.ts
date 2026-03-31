@@ -1,4 +1,4 @@
-﻿import { err, type LectureDetails, type LectureSummary } from "@vm/shared";
+import { err, type LectureDetails, type LectureSummary } from "@vm/shared";
 import { HttpClient } from "../http/httpClient";
 
 export class CatalogService {

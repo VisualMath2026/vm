@@ -1,4 +1,4 @@
-﻿import { Camera2D } from "../core/camera2d";
+import { Camera2D } from "../core/camera2d";
 
 export interface Drawable2D {
   id: string;

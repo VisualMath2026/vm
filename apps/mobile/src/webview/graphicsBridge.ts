@@ -1,4 +1,4 @@
-﻿export type MobileToGraphics =
+export type MobileToGraphics =
   | { type: "INIT_SCENE"; payload: { scene: unknown } }
   | { type: "REQUEST_SNAPSHOT" }
   | { type: "UPDATE_PARAMS"; payload: Record<string, number | string | boolean> };

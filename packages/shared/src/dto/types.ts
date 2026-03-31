@@ -1,4 +1,4 @@
-﻿export type Role = "student" | "teacher" | "admin";
+export type Role = "student" | "teacher" | "admin";
 export type BlockType = "text" | "quiz" | "visual";
 
 export interface UserProfile {

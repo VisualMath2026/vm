@@ -9,25 +9,25 @@ importers:
   .:
     devDependencies:
       '@eslint/js':
-        specifier: ^9.21.0
+        specifier: ^9.39.1
         version: 9.39.4
       '@types/node':
-        specifier: ^22.13.10
+        specifier: ^22.18.1
         version: 22.19.15
       eslint:
-        specifier: ^9.21.0
+        specifier: ^9.39.1
         version: 9.39.4
       globals:
-        specifier: ^15.15.0
-        version: 15.15.0
+        specifier: ^16.4.0
+        version: 16.5.0
       prettier:
-        specifier: ^3.5.2
+        specifier: ^3.6.2
         version: 3.8.1
       typescript:
-        specifier: ^5.8.2
+        specifier: ^5.9.2
         version: 5.9.3
       typescript-eslint:
-        specifier: ^8.25.0
+        specifier: ^8.46.1
         version: 8.58.0(eslint@9.39.4)(typescript@5.9.3)
 
   apps/mobile:
@@ -1960,8 +1960,8 @@ packages:
     resolution: {integrity: sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ==}
     engines: {node: '>=18'}
 
-  globals@15.15.0:
-    resolution: {integrity: sha512-7ACyT3wmyp3I61S4fG682L0VA2RGD9otkqGJIwNUMF1SWUombIIk+af1unuDYgMm082aHYwD+mzJvv9Iu8dsgg==}
+  globals@16.5.0:
+    resolution: {integrity: sha512-c/c15i26VrJ4IRt5Z89DnIzCGDn9EcebibhAOjw5ibqEHsE1wLUgkPn9RDmNcUKyU87GeaL633nyJ+pplFR2ZQ==}
     engines: {node: '>=18'}
 
   gopd@1.2.0:
@@ -5701,7 +5701,7 @@ snapshots:
 
   globals@14.0.0: {}
 
-  globals@15.15.0: {}
+  globals@16.5.0: {}
 
   gopd@1.2.0: {}
 

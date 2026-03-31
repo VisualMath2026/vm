@@ -1,4 +1,4 @@
-﻿import { Camera2D } from "./camera2d";
+import { Camera2D } from "./camera2d";
 import type { Drawable2D } from "../renderer2d/primitives";
 
 export interface Scene2DSnapshot {

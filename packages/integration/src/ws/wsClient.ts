@@ -1,4 +1,4 @@
-﻿import { err, type AppError, type WsCommand, type WsEvent } from "@vm/shared";
+import { err, type AppError, type WsCommand, type WsEvent } from "@vm/shared";
 
 export type WsState = "disconnected" | "connecting" | "connected" | "offline";
 

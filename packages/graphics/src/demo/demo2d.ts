@@ -1,4 +1,4 @@
-﻿import { Scene2D } from "../core/scene2d";
+import { Scene2D } from "../core/scene2d";
 import { Interaction2D } from "../interaction/interaction2d";
 import { AxisGrid, FunctionPlot } from "../renderer2d/primitives";
 import { objectFactory } from "../serialize/objectFactory";

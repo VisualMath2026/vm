@@ -1,4 +1,4 @@
-﻿import { err, normalizeError, type AppError } from "@vm/shared";
+import { err, normalizeError, type AppError } from "@vm/shared";
 
 export interface HttpClientOptions {
   baseUrl: string;

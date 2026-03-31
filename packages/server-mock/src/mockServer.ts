@@ -1,4 +1,4 @@
-﻿import cors from "cors";
+import cors from "cors";
 import express from "express";
 
 type Role = "student" | "teacher" | "admin";

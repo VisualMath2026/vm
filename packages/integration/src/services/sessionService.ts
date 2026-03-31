@@ -1,4 +1,4 @@
-﻿import type { SessionState, WsEvent } from "@vm/shared";
+import type { SessionState, WsEvent } from "@vm/shared";
 import { HttpClient } from "../http/httpClient";
 import { WsClient } from "../ws/wsClient";
 

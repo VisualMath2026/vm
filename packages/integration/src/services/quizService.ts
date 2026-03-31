@@ -1,4 +1,4 @@
-﻿import { err } from "@vm/shared";
+import { err } from "@vm/shared";
 import { HttpClient } from "../http/httpClient";
 
 export type QuizAnswerPayload =

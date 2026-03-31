@@ -1,4 +1,4 @@
-﻿import { Scene2D } from "../core/scene2d";
+import { Scene2D } from "../core/scene2d";
 
 export class Interaction2D {
   private dragging = false;
