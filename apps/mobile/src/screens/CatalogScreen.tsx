@@ -16,6 +16,7 @@ import type { AppTheme } from "../theme";
 type CatalogScreenProps = {
   theme: AppTheme;
   lectures: LectureItem[];
+  lastOpenedLecture?: LectureItem | null;
   isLoading?: boolean;
   hasError?: boolean;
   isOffline?: boolean;
@@ -26,6 +27,7 @@ type CatalogScreenProps = {
 export function CatalogScreen({
   theme,
   lectures,
+  lastOpenedLecture = null,
   isLoading = false,
   hasError = false,
   isOffline = false,
@@ -63,6 +65,24 @@ export function CatalogScreen({
       <Text style={styles.subtitle}>
         Поиск и просмотр доступных материалов для VM Mobile.
       </Text>
+
+      {lastOpenedLecture ? (
+        <SectionCard
+          title="Последняя открытая лекция"
+          subtitle={`${lastOpenedLecture.subject} • ${lastOpenedLecture.semester}`}
+          theme={theme}
+        >
+          <Text style={styles.description}>{lastOpenedLecture.title}</Text>
+          <View style={styles.cardAction}>
+            <AppButton
+              label="Открыть снова"
+              onPress={() => onOpenLecture(lastOpenedLecture)}
+              theme={theme}
+              variant="secondary"
+            />
+          </View>
+        </SectionCard>
+      ) : null}
 
       <SectionCard
         title="Поиск"

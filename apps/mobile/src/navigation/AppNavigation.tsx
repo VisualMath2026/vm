@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { LoadingState } from "../components/ui/LoadingState";
 import { mockLectures, type LectureItem } from "../mocks/lectures";
 import {
   createMockSession,
@@ -18,6 +19,16 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { SessionScreen } from "../screens/SessionScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
+import {
+  readCatalogSnapshot,
+  readLastLectureId,
+  readNotificationsEnabled,
+  readThemeMode,
+  writeCatalogSnapshot,
+  writeLastLectureId,
+  writeNotificationsEnabled,
+  writeThemeMode
+} from "../storage/mobileCache";
 import { createAppTheme, type AppTheme, type ThemeMode } from "../theme";
 
 type ScreenKey = "catalog" | "details" | "session" | "task" | "result" | "profile";
@@ -28,11 +39,91 @@ export function AppNavigation() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeScreen, setActiveScreen] = useState<ScreenKey>("catalog");
   const [user, setUser] = useState<UserProfile>(mockUser);
+  const [catalogLectures, setCatalogLectures] = useState<LectureItem[]>(mockLectures);
   const [selectedLecture, setSelectedLecture] = useState<LectureItem | null>(null);
+  const [lastOpenedLectureId, setLastOpenedLectureId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
   const [currentResult, setCurrentResult] = useState<TaskResult | null>(null);
+  const [isHydrating, setIsHydrating] = useState(true);
 
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function hydrateCache() {
+      try {
+        const [
+          cachedLectures,
+          cachedLastLectureId,
+          cachedThemeMode,
+          cachedNotificationsEnabled
+        ] = await Promise.all([
+          readCatalogSnapshot(),
+          readLastLectureId(),
+          readThemeMode(),
+          readNotificationsEnabled()
+        ]);
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (cachedLectures && cachedLectures.length > 0) {
+          setCatalogLectures(cachedLectures);
+        } else {
+          setCatalogLectures(mockLectures);
+          await writeCatalogSnapshot(mockLectures);
+        }
+
+        if (cachedLastLectureId) {
+          setLastOpenedLectureId(cachedLastLectureId);
+        }
+
+        if (cachedThemeMode) {
+          setThemeMode(cachedThemeMode);
+        }
+
+        if (typeof cachedNotificationsEnabled === "boolean") {
+          setNotificationsEnabled(cachedNotificationsEnabled);
+        }
+      } finally {
+        if (isMounted) {
+          setIsHydrating(false);
+        }
+      }
+    }
+
+    void hydrateCache();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    void writeCatalogSnapshot(catalogLectures);
+  }, [catalogLectures, isHydrating]);
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    void writeThemeMode(themeMode);
+  }, [themeMode, isHydrating]);
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    void writeNotificationsEnabled(notificationsEnabled);
+  }, [notificationsEnabled, isHydrating]);
 
   function handleLogin(login: string, password: string) {
     if (!login.trim() || !password.trim()) {
@@ -62,6 +153,8 @@ export function AppNavigation() {
 
   function handleOpenLecture(lecture: LectureItem) {
     setSelectedLecture(lecture);
+    setLastOpenedLectureId(lecture.id);
+    void writeLastLectureId(lecture.id);
     setCurrentSession(null);
     setCurrentResult(null);
     setActiveScreen("details");
@@ -110,6 +203,16 @@ export function AppNavigation() {
     setActiveScreen("session");
   }
 
+  if (isHydrating) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.centeredState}>
+          <LoadingState theme={theme} text="Восстанавливаем локальный кэш..." />
+        </View>
+      </View>
+    );
+  }
+
   if (!isAuthenticated) {
     return <LoginScreen theme={theme} onLogin={handleLogin} />;
   }
@@ -117,13 +220,17 @@ export function AppNavigation() {
   const bottomTabScreen: "catalog" | "profile" =
     activeScreen === "profile" ? "profile" : "catalog";
 
+  const lastOpenedLecture =
+    catalogLectures.find((lecture) => lecture.id === lastOpenedLectureId) ?? null;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.content}>
         {activeScreen === "catalog" ? (
           <CatalogScreen
             theme={theme}
-            lectures={mockLectures}
+            lectures={catalogLectures}
+            lastOpenedLecture={lastOpenedLecture}
             isOffline
             onRetry={() => undefined}
             onOpenLecture={handleOpenLecture}
@@ -286,6 +393,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1
+  },
+  centeredState: {
+    flex: 1,
+    justifyContent: "center"
   },
   tabBar: {
     flexDirection: "row",
