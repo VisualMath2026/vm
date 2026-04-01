@@ -6,50 +6,54 @@ import { AppButton } from "../components/ui/AppButton";
 import { Screen } from "../components/ui/Screen";
 import { SectionCard } from "../components/ui/SectionCard";
 import type { LectureItem } from "../mocks/lectures";
+import type { SessionData } from "../mocks/session";
 import type { AppTheme } from "../theme";
 
-type LectureDetailsScreenProps = {
+type SessionScreenProps = {
   theme: AppTheme;
   lecture: LectureItem;
+  session: SessionData;
   onBack: () => void;
-  onOpenSession: () => void;
+  onOpenTask: () => void;
 };
 
-export function LectureDetailsScreen({
+export function SessionScreen({
   theme,
   lecture,
+  session,
   onBack,
-  onOpenSession
-}: LectureDetailsScreenProps) {
+  onOpenTask
+}: SessionScreenProps) {
   const styles = createStyles(theme);
 
   return (
     <Screen theme={theme}>
       <View style={styles.headerActions}>
         <AppButton
-          label="Назад в каталог"
+          label="Назад к лекции"
           onPress={onBack}
           theme={theme}
           variant="secondary"
         />
       </View>
 
-      <Text style={styles.title}>{lecture.title}</Text>
-      <Text style={styles.subtitle}>
-        {lecture.subject} • {lecture.semester} • {lecture.level}
-      </Text>
+      <Text style={styles.title}>Сессия занятия</Text>
+      <Text style={styles.subtitle}>{lecture.title}</Text>
 
       <SectionCard
-        title="Описание лекции"
-        subtitle={`Автор: ${lecture.author}`}
+        title="Состояние сессии"
+        subtitle={`Код подключения: ${session.sessionCode}`}
         theme={theme}
       >
-        <Text style={styles.bodyText}>{lecture.description}</Text>
+        <Text style={styles.metaText}>Статус: {session.status}</Text>
+        <Text style={styles.metaText}>Подключение: {session.connectionStatus}</Text>
+        <Text style={styles.metaText}>Участников: {session.participantsCount}</Text>
+        <Text style={styles.metaText}>Текущий блок: {session.currentBlockTitle}</Text>
       </SectionCard>
 
       <SectionCard
-        title="Состав блоков"
-        subtitle={`Оценочная длительность: ${lecture.estimatedDuration}`}
+        title="Состав лекции"
+        subtitle="Блоки текущего занятия"
         theme={theme}
       >
         {lecture.blocks.map((block, index) => (
@@ -60,30 +64,16 @@ export function LectureDetailsScreen({
       </SectionCard>
 
       <SectionCard
-        title="Требования к участию"
-        subtitle="Подготовка перед началом занятия"
+        title="Проверочный блок"
+        subtitle="Локальный сценарий без сервера"
         theme={theme}
       >
-        {lecture.participationRequirements.map((item, index) => (
-          <Text key={`${lecture.id}-${index}`} style={styles.listItem}>
-            • {item}
-          </Text>
-        ))}
-      </SectionCard>
-
-      <SectionCard
-        title="Сценарий занятия"
-        subtitle="Локальный flow для VM Mobile"
-        theme={theme}
-      >
-        <Text style={styles.bodyText}>
-          Можно открыть учебную сессию, пройти задание и увидеть результат.
-        </Text>
+        <Text style={styles.bodyText}>{session.question.prompt}</Text>
 
         <View style={styles.actionTop}>
           <AppButton
-            label="Перейти к сессии"
-            onPress={onOpenSession}
+            label="Открыть задание"
+            onPress={onOpenTask}
             theme={theme}
           />
         </View>
@@ -111,6 +101,11 @@ function createStyles(theme: AppTheme) {
     bodyText: {
       fontSize: theme.typography.body,
       color: theme.colors.text
+    },
+    metaText: {
+      fontSize: theme.typography.body,
+      color: theme.colors.text,
+      marginBottom: theme.spacing.xs
     },
     listItem: {
       fontSize: theme.typography.body,
