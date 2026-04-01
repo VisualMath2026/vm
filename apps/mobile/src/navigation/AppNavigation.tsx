@@ -1,15 +1,16 @@
-﻿import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { mockLectures } from "../mocks/lectures";
+import { mockLectures, type LectureItem } from "../mocks/lectures";
 import { mockUser, type UserProfile } from "../mocks/user";
 import { CatalogScreen } from "../screens/CatalogScreen";
+import { LectureDetailsScreen } from "../screens/LectureDetailsScreen";
 import { LoginScreen } from "../screens/LoginScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { createAppTheme, type AppTheme, type ThemeMode } from "../theme";
 
-type ScreenKey = "catalog" | "profile";
+type ScreenKey = "catalog" | "details" | "profile";
 
 export function AppNavigation() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
@@ -17,6 +18,7 @@ export function AppNavigation() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeScreen, setActiveScreen] = useState<ScreenKey>("catalog");
   const [user, setUser] = useState<UserProfile>(mockUser);
+  const [selectedLecture, setSelectedLecture] = useState<LectureItem | null>(null);
 
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
 
@@ -36,6 +38,16 @@ export function AppNavigation() {
 
   function handleLogout() {
     setIsAuthenticated(false);
+    setSelectedLecture(null);
+    setActiveScreen("catalog");
+  }
+
+  function handleOpenLecture(lecture: LectureItem) {
+    setSelectedLecture(lecture);
+    setActiveScreen("details");
+  }
+
+  function handleBackToCatalog() {
     setActiveScreen("catalog");
   }
 
@@ -50,9 +62,21 @@ export function AppNavigation() {
           <CatalogScreen
             theme={theme}
             lectures={mockLectures}
+            isOffline
             onRetry={() => undefined}
+            onOpenLecture={handleOpenLecture}
           />
-        ) : (
+        ) : null}
+
+        {activeScreen === "details" && selectedLecture ? (
+          <LectureDetailsScreen
+            theme={theme}
+            lecture={selectedLecture}
+            onBack={handleBackToCatalog}
+          />
+        ) : null}
+
+        {activeScreen === "profile" ? (
           <ProfileScreen
             theme={theme}
             user={user}
@@ -68,13 +92,16 @@ export function AppNavigation() {
             }
             onLogout={handleLogout}
           />
-        )}
+        ) : null}
       </View>
 
       <BottomTabs
         theme={theme}
-        activeScreen={activeScreen}
-        onChange={setActiveScreen}
+        activeScreen={activeScreen === "details" ? "catalog" : activeScreen}
+        onChange={(screen) => {
+          setActiveScreen(screen);
+          setSelectedLecture(null);
+        }}
       />
     </View>
   );
@@ -82,8 +109,8 @@ export function AppNavigation() {
 
 type BottomTabsProps = {
   theme: AppTheme;
-  activeScreen: ScreenKey;
-  onChange: (screen: ScreenKey) => void;
+  activeScreen: "catalog" | "profile";
+  onChange: (screen: "catalog" | "profile") => void;
 };
 
 function BottomTabs({

@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 
 import { StyleSheet, Text, View } from "react-native";
 
@@ -7,6 +7,7 @@ import { AppInput } from "../components/ui/AppInput";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorState } from "../components/ui/ErrorState";
 import { LoadingState } from "../components/ui/LoadingState";
+import { OfflineState } from "../components/ui/OfflineState";
 import { Screen } from "../components/ui/Screen";
 import { SectionCard } from "../components/ui/SectionCard";
 import type { LectureItem } from "../mocks/lectures";
@@ -17,7 +18,9 @@ type CatalogScreenProps = {
   lectures: LectureItem[];
   isLoading?: boolean;
   hasError?: boolean;
+  isOffline?: boolean;
   onRetry?: () => void;
+  onOpenLecture: (lecture: LectureItem) => void;
 };
 
 export function CatalogScreen({
@@ -25,7 +28,9 @@ export function CatalogScreen({
   lectures,
   isLoading = false,
   hasError = false,
-  onRetry
+  isOffline = false,
+  onRetry,
+  onOpenLecture
 }: CatalogScreenProps) {
   const styles = createStyles(theme);
   const [query, setQuery] = useState("");
@@ -80,7 +85,20 @@ export function CatalogScreen({
       >
         <Text style={styles.metaText}>Всего лекций: {lectures.length}</Text>
         <Text style={styles.metaText}>Найдено по запросу: {filteredLectures.length}</Text>
+        <Text style={styles.metaText}>
+          Режим сети: {isOffline ? "offline / кэш" : "online"}
+        </Text>
       </SectionCard>
+
+      {isOffline ? (
+        <View style={styles.infoBlock}>
+          <OfflineState
+            theme={theme}
+            description="Сейчас отображается локальный кэш каталога. Повторная загрузка будет добавлена позже вместе с API."
+            onRetry={onRetry}
+          />
+        </View>
+      ) : null}
 
       {isLoading ? <LoadingState theme={theme} text="Загружаем каталог..." /> : null}
 
@@ -120,7 +138,16 @@ export function CatalogScreen({
             >
               <Text style={styles.description}>{lecture.description}</Text>
               <Text style={styles.metaText}>Автор: {lecture.author}</Text>
+              <Text style={styles.metaText}>Длительность: {lecture.estimatedDuration}</Text>
               <Text style={styles.tags}>Теги: {lecture.tags.join(", ")}</Text>
+
+              <View style={styles.cardAction}>
+                <AppButton
+                  label="Открыть лекцию"
+                  onPress={() => onOpenLecture(lecture)}
+                  theme={theme}
+                />
+              </View>
             </SectionCard>
           ))
         : null}
@@ -157,6 +184,12 @@ function createStyles(theme: AppTheme) {
       fontWeight: "600"
     },
     resetButton: {
+      marginTop: theme.spacing.md
+    },
+    infoBlock: {
+      marginBottom: theme.spacing.md
+    },
+    cardAction: {
       marginTop: theme.spacing.md
     }
   });
