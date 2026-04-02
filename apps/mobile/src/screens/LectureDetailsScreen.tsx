@@ -4,7 +4,9 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../components/ui/AppButton";
 import { Screen } from "../components/ui/Screen";
+import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { SectionCard } from "../components/ui/SectionCard";
+import { StatusPill } from "../components/ui/StatusPill";
 import type { LectureItem } from "../mocks/lectures";
 import type { AppTheme } from "../theme";
 
@@ -25,23 +27,32 @@ export function LectureDetailsScreen({
 
   return (
     <Screen theme={theme}>
-      <View style={styles.headerActions}>
-        <AppButton
-          label="Назад в каталог"
-          onPress={onBack}
+      <ScreenHeader
+        theme={theme}
+        title={lecture.title}
+        subtitle={`${lecture.subject} • ${lecture.semester} • ${lecture.level}`}
+        rightSlot={
+          <AppButton
+            label="Назад в каталог"
+            onPress={onBack}
+            theme={theme}
+            variant="secondary"
+          />
+        }
+      />
+
+      <View style={styles.metaRow}>
+        <StatusPill theme={theme} label={lecture.author} tone="neutral" />
+        <StatusPill
           theme={theme}
-          variant="secondary"
+          label={lecture.estimatedDuration}
+          tone="info"
         />
       </View>
 
-      <Text style={styles.title}>{lecture.title}</Text>
-      <Text style={styles.subtitle}>
-        {lecture.subject} • {lecture.semester} • {lecture.level}
-      </Text>
-
       <SectionCard
         title="Описание лекции"
-        subtitle={`Автор: ${lecture.author}`}
+        subtitle="Краткое содержание"
         theme={theme}
       >
         <Text style={styles.bodyText}>{lecture.description}</Text>
@@ -49,7 +60,7 @@ export function LectureDetailsScreen({
 
       <SectionCard
         title="Состав блоков"
-        subtitle={`Оценочная длительность: ${lecture.estimatedDuration}`}
+        subtitle="Что входит в лекцию"
         theme={theme}
       >
         {lecture.blocks.map((block, index) => (
@@ -61,7 +72,7 @@ export function LectureDetailsScreen({
 
       <SectionCard
         title="Требования к участию"
-        subtitle="Подготовка перед началом занятия"
+        subtitle="Что желательно знать заранее"
         theme={theme}
       >
         {lecture.participationRequirements.map((item, index) => (
@@ -72,12 +83,12 @@ export function LectureDetailsScreen({
       </SectionCard>
 
       <SectionCard
-        title="Сценарий занятия"
-        subtitle="Локальный flow для VM Mobile"
+        title="Следующий шаг"
+        subtitle="Локальный demo-flow"
         theme={theme}
       >
         <Text style={styles.bodyText}>
-          Можно открыть учебную сессию, пройти задание и увидеть результат.
+          Можно перейти к сессии, открыть задание и пройти проверочный блок.
         </Text>
 
         <View style={styles.actionTop}>
@@ -94,20 +105,6 @@ export function LectureDetailsScreen({
 
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
-    headerActions: {
-      marginBottom: theme.spacing.md
-    },
-    title: {
-      fontSize: theme.typography.screenTitle,
-      fontWeight: "800",
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs
-    },
-    subtitle: {
-      fontSize: theme.typography.body,
-      color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.lg
-    },
     bodyText: {
       fontSize: theme.typography.body,
       color: theme.colors.text
@@ -119,6 +116,11 @@ function createStyles(theme: AppTheme) {
     },
     actionTop: {
       marginTop: theme.spacing.md
+    },
+    metaRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginBottom: theme.spacing.sm
     }
   });
 }

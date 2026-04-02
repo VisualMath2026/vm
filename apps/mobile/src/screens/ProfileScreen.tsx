@@ -1,20 +1,28 @@
-﻿import React from "react";
+import React from "react";
 
 import { StyleSheet, Switch, Text, View } from "react-native";
 
 import { AppButton } from "../components/ui/AppButton";
 import { Screen } from "../components/ui/Screen";
+import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { SectionCard } from "../components/ui/SectionCard";
+import { StatusPill } from "../components/ui/StatusPill";
 import type { UserProfile } from "../mocks/user";
 import type { AppTheme, ThemeMode } from "../theme";
+
+type DemoDataMode = "online" | "offline" | "loading" | "error";
 
 type ProfileScreenProps = {
   theme: AppTheme;
   user: UserProfile;
   themeMode: ThemeMode;
   notificationsEnabled: boolean;
+  catalogMode: DemoDataMode;
+  sessionMode: DemoDataMode;
   onToggleTheme: () => void;
   onToggleNotifications: () => void;
+  onCycleCatalogMode: () => void;
+  onCycleSessionMode: () => void;
   onLogout: () => void;
 };
 
@@ -23,18 +31,23 @@ export function ProfileScreen({
   user,
   themeMode,
   notificationsEnabled,
+  catalogMode,
+  sessionMode,
   onToggleTheme,
   onToggleNotifications,
+  onCycleCatalogMode,
+  onCycleSessionMode,
   onLogout
 }: ProfileScreenProps) {
   const styles = createStyles(theme);
 
   return (
     <Screen theme={theme}>
-      <Text style={styles.title}>Профиль</Text>
-      <Text style={styles.subtitle}>
-        Пользовательские данные и базовые настройки приложения.
-      </Text>
+      <ScreenHeader
+        theme={theme}
+        title="Профиль"
+        subtitle="Пользовательские данные, настройки и demo-состояния."
+      />
 
       <SectionCard
         title={user.fullName}
@@ -75,6 +88,43 @@ export function ProfileScreen({
       </SectionCard>
 
       <SectionCard
+        title="Demo-состояния"
+        subtitle="Быстрое переключение loading / error / offline"
+        theme={theme}
+      >
+        <View style={styles.pillRow}>
+          <StatusPill
+            theme={theme}
+            label={`Каталог: ${catalogMode}`}
+            tone={mapModeToTone(catalogMode)}
+          />
+          <StatusPill
+            theme={theme}
+            label={`Сессия: ${sessionMode}`}
+            tone={mapModeToTone(sessionMode)}
+          />
+        </View>
+
+        <View style={styles.actionGroup}>
+          <AppButton
+            label="Сменить состояние каталога"
+            onPress={onCycleCatalogMode}
+            theme={theme}
+            variant="secondary"
+          />
+        </View>
+
+        <View style={styles.actionGroup}>
+          <AppButton
+            label="Сменить состояние сессии"
+            onPress={onCycleSessionMode}
+            theme={theme}
+            variant="secondary"
+          />
+        </View>
+      </SectionCard>
+
+      <SectionCard
         title="Сессия"
         subtitle="Локальное управление пользователем"
         theme={theme}
@@ -90,19 +140,24 @@ export function ProfileScreen({
   );
 }
 
+function mapModeToTone(mode: DemoDataMode) {
+  if (mode === "online") {
+    return "success";
+  }
+
+  if (mode === "offline") {
+    return "warning";
+  }
+
+  if (mode === "loading") {
+    return "info";
+  }
+
+  return "danger";
+}
+
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
-    title: {
-      fontSize: theme.typography.screenTitle,
-      fontWeight: "800",
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs
-    },
-    subtitle: {
-      fontSize: theme.typography.body,
-      color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.lg
-    },
     metaText: {
       fontSize: theme.typography.body,
       color: theme.colors.text,
@@ -131,6 +186,13 @@ function createStyles(theme: AppTheme) {
       height: 1,
       backgroundColor: theme.colors.border,
       marginVertical: theme.spacing.md
+    },
+    actionGroup: {
+      marginTop: theme.spacing.md
+    },
+    pillRow: {
+      flexDirection: "row",
+      flexWrap: "wrap"
     }
   });
 }

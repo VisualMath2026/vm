@@ -9,7 +9,9 @@ import { ErrorState } from "../components/ui/ErrorState";
 import { LoadingState } from "../components/ui/LoadingState";
 import { OfflineState } from "../components/ui/OfflineState";
 import { Screen } from "../components/ui/Screen";
+import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { SectionCard } from "../components/ui/SectionCard";
+import { StatusPill } from "../components/ui/StatusPill";
 import type { LectureItem } from "../mocks/lectures";
 import type { AppTheme } from "../theme";
 
@@ -61,10 +63,11 @@ export function CatalogScreen({
 
   return (
     <Screen theme={theme}>
-      <Text style={styles.title}>Каталог лекций</Text>
-      <Text style={styles.subtitle}>
-        Поиск и просмотр доступных материалов для VM Mobile.
-      </Text>
+      <ScreenHeader
+        theme={theme}
+        title="Каталог лекций"
+        subtitle="Поиск, повторное открытие лекций и локальный offline-кэш."
+      />
 
       {lastOpenedLecture ? (
         <SectionCard
@@ -73,6 +76,15 @@ export function CatalogScreen({
           theme={theme}
         >
           <Text style={styles.description}>{lastOpenedLecture.title}</Text>
+
+          <View style={styles.metaRow}>
+            <StatusPill
+              theme={theme}
+              label={`Длительность: ${lastOpenedLecture.estimatedDuration}`}
+              tone="info"
+            />
+          </View>
+
           <View style={styles.cardAction}>
             <AppButton
               label="Открыть снова"
@@ -86,7 +98,7 @@ export function CatalogScreen({
 
       <SectionCard
         title="Поиск"
-        subtitle="Подготовка экрана каталога под требования ТЗ."
+        subtitle="По названию, тегам, предмету или автору"
         theme={theme}
       >
         <AppInput
@@ -99,33 +111,70 @@ export function CatalogScreen({
       </SectionCard>
 
       <SectionCard
-        title="Сводка"
-        subtitle="Текущий локальный набор данных"
+        title="Состояние данных"
+        subtitle="Быстрый обзор текущего режима"
         theme={theme}
       >
-        <Text style={styles.metaText}>Всего лекций: {lectures.length}</Text>
-        <Text style={styles.metaText}>Найдено по запросу: {filteredLectures.length}</Text>
-        <Text style={styles.metaText}>
-          Режим сети: {isOffline ? "offline / кэш" : "online"}
-        </Text>
+        <View style={styles.metaRow}>
+          <StatusPill
+            theme={theme}
+            label={`Всего лекций: ${lectures.length}`}
+            tone="neutral"
+          />
+          <StatusPill
+            theme={theme}
+            label={`Найдено: ${filteredLectures.length}`}
+            tone="info"
+          />
+          <StatusPill
+            theme={theme}
+            label={
+              isLoading
+                ? "loading"
+                : hasError
+                  ? "error"
+                  : isOffline
+                    ? "offline"
+                    : "online"
+            }
+            tone={
+              isLoading
+                ? "warning"
+                : hasError
+                  ? "danger"
+                  : isOffline
+                    ? "warning"
+                    : "success"
+            }
+          />
+        </View>
       </SectionCard>
 
       {isOffline ? (
         <View style={styles.infoBlock}>
           <OfflineState
             theme={theme}
-            description="Сейчас отображается локальный кэш каталога. Повторная загрузка будет добавлена позже вместе с API."
+            description="Сейчас отображается сохранённый кэш каталога. Можно продолжить просмотр лекций."
             onRetry={onRetry}
           />
         </View>
       ) : null}
 
-      {isLoading ? <LoadingState theme={theme} text="Загружаем каталог..." /> : null}
+      {isLoading ? (
+        <SectionCard
+          title="Загрузка каталога"
+          subtitle="Имитация получения данных"
+          theme={theme}
+        >
+          <LoadingState theme={theme} text="Обновляем список лекций..." />
+        </SectionCard>
+      ) : null}
 
       {!isLoading && hasError ? (
         <ErrorState
           theme={theme}
-          description="Каталог пока не удалось получить. Попробуй повторить загрузку."
+          title="Не удалось обновить каталог"
+          description="Локальные данные можно оставить, а состояние вернуть кнопкой «Повторить»."
           onRetry={onRetry}
         />
       ) : null}
@@ -157,8 +206,20 @@ export function CatalogScreen({
               theme={theme}
             >
               <Text style={styles.description}>{lecture.description}</Text>
-              <Text style={styles.metaText}>Автор: {lecture.author}</Text>
-              <Text style={styles.metaText}>Длительность: {lecture.estimatedDuration}</Text>
+
+              <View style={styles.metaRow}>
+                <StatusPill
+                  theme={theme}
+                  label={lecture.author}
+                  tone="neutral"
+                />
+                <StatusPill
+                  theme={theme}
+                  label={lecture.estimatedDuration}
+                  tone="info"
+                />
+              </View>
+
               <Text style={styles.tags}>Теги: {lecture.tags.join(", ")}</Text>
 
               <View style={styles.cardAction}>
@@ -177,31 +238,16 @@ export function CatalogScreen({
 
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
-    title: {
-      fontSize: theme.typography.screenTitle,
-      fontWeight: "800",
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs
-    },
-    subtitle: {
-      fontSize: theme.typography.body,
-      color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.lg
-    },
     description: {
       fontSize: theme.typography.body,
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
-    metaText: {
-      fontSize: theme.typography.body,
-      color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.xs
-    },
     tags: {
       fontSize: theme.typography.caption,
       color: theme.colors.primary,
-      fontWeight: "600"
+      fontWeight: "600",
+      marginTop: theme.spacing.xs
     },
     resetButton: {
       marginTop: theme.spacing.md
@@ -211,6 +257,10 @@ function createStyles(theme: AppTheme) {
     },
     cardAction: {
       marginTop: theme.spacing.md
+    },
+    metaRow: {
+      flexDirection: "row",
+      flexWrap: "wrap"
     }
   });
 }

@@ -5,7 +5,9 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
 import { Screen } from "../components/ui/Screen";
+import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { SectionCard } from "../components/ui/SectionCard";
+import { StatusPill } from "../components/ui/StatusPill";
 import type { SessionData, TaskSubmission } from "../mocks/session";
 import type { AppTheme } from "../theme";
 
@@ -93,17 +95,32 @@ export function TaskScreen({
 
   return (
     <Screen theme={theme}>
-      <View style={styles.headerActions}>
-        <AppButton
-          label="Назад к сессии"
-          onPress={onBack}
+      <ScreenHeader
+        theme={theme}
+        title="Задание"
+        subtitle="Проверочный блок текущей сессии"
+        rightSlot={
+          <AppButton
+            label="Назад к сессии"
+            onPress={onBack}
+            theme={theme}
+            variant="secondary"
+          />
+        }
+      />
+
+      <View style={styles.metaRow}>
+        <StatusPill
           theme={theme}
-          variant="secondary"
+          label={`Тип: ${session.question.type === "single-choice" ? "выбор" : "ответ"}`}
+          tone="info"
+        />
+        <StatusPill
+          theme={theme}
+          label={`Баллы: ${session.question.points}`}
+          tone="success"
         />
       </View>
-
-      <Text style={styles.title}>Задание</Text>
-      <Text style={styles.subtitle}>Проверочный блок текущей сессии</Text>
 
       <SectionCard
         title="Таймер"
@@ -118,7 +135,7 @@ export function TaskScreen({
 
       <SectionCard
         title="Вопрос"
-        subtitle={`Тип: ${session.question.type === "single-choice" ? "одиночный выбор" : "короткий ответ"}`}
+        subtitle="Ответ фиксируется сразу после отправки"
         theme={theme}
       >
         <Text style={styles.questionText}>{session.question.prompt}</Text>
@@ -188,20 +205,6 @@ export function TaskScreen({
 
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
-    headerActions: {
-      marginBottom: theme.spacing.md
-    },
-    title: {
-      fontSize: theme.typography.screenTitle,
-      fontWeight: "800",
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs
-    },
-    subtitle: {
-      fontSize: theme.typography.body,
-      color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.lg
-    },
     timer: {
       fontSize: theme.typography.title,
       fontWeight: "800",
@@ -237,6 +240,11 @@ function createStyles(theme: AppTheme) {
     },
     actionGroup: {
       marginTop: theme.spacing.md
+    },
+    metaRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginBottom: theme.spacing.sm
     }
   });
 }

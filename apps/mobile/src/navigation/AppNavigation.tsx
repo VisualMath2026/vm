@@ -11,6 +11,12 @@ import {
   type TaskResult,
   type TaskSubmission
 } from "../mocks/session";
+import {
+  createTeacherManagedSession,
+  moveTeacherSessionBlock,
+  updateTeacherSessionStatus,
+  type TeacherManagedSession
+} from "../mocks/teacher";
 import { mockUser, type UserProfile } from "../mocks/user";
 import { CatalogScreen } from "../screens/CatalogScreen";
 import { LectureDetailsScreen } from "../screens/LectureDetailsScreen";
@@ -19,6 +25,8 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { SessionScreen } from "../screens/SessionScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
+import { TeacherHomeScreen } from "../screens/TeacherHomeScreen";
+import { TeacherSessionControlScreen } from "../screens/TeacherSessionControlScreen";
 import {
   clearAuthSession,
   readAuthSession,
@@ -36,7 +44,18 @@ import {
 } from "../storage/mobileCache";
 import { createAppTheme, type AppTheme, type ThemeMode } from "../theme";
 
-type ScreenKey = "catalog" | "details" | "session" | "task" | "result" | "profile";
+type ScreenKey =
+  | "catalog"
+  | "details"
+  | "session"
+  | "task"
+  | "result"
+  | "teacherHome"
+  | "teacherSession"
+  | "profile";
+
+type LoginRole = "student" | "teacher";
+type DemoDataMode = "online" | "offline" | "loading" | "error";
 
 export function AppNavigation() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
@@ -49,9 +68,14 @@ export function AppNavigation() {
   const [lastOpenedLectureId, setLastOpenedLectureId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
   const [currentResult, setCurrentResult] = useState<TaskResult | null>(null);
+  const [currentTeacherSession, setCurrentTeacherSession] =
+    useState<TeacherManagedSession | null>(null);
+  const [catalogMode, setCatalogMode] = useState<DemoDataMode>("offline");
+  const [sessionMode, setSessionMode] = useState<DemoDataMode>("online");
   const [isHydrating, setIsHydrating] = useState(true);
 
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
+  const isTeacher = user.role === "teacher";
 
   useEffect(() => {
     let isMounted = true;
@@ -98,11 +122,19 @@ export function AppNavigation() {
         if (storedAuthSession) {
           setUser({
             ...mockUser,
+            fullName:
+              storedAuthSession.role === "teacher"
+                ? "Демо преподаватель"
+                : mockUser.fullName,
             login: storedAuthSession.userLogin,
             role: storedAuthSession.role
           });
           setIsAuthenticated(true);
-          setActiveScreen("catalog");
+          setActiveScreen(
+            storedAuthSession.role === "teacher"
+              ? "teacherHome"
+              : "catalog"
+          );
         }
       } finally {
         if (isMounted) {
@@ -146,7 +178,27 @@ export function AppNavigation() {
     return `vm-token-${login.trim().toLowerCase()}-${Date.now()}`;
   }
 
-  function handleLogin(login: string, password: string) {
+  function nextMode(currentMode: DemoDataMode): DemoDataMode {
+    if (currentMode === "online") {
+      return "offline";
+    }
+
+    if (currentMode === "offline") {
+      return "loading";
+    }
+
+    if (currentMode === "loading") {
+      return "error";
+    }
+
+    return "online";
+  }
+
+  function handleLogin(
+    login: string,
+    password: string,
+    role: LoginRole
+  ) {
     if (!login.trim() || !password.trim()) {
       return "Введите логин и пароль.";
     }
@@ -155,31 +207,37 @@ export function AppNavigation() {
 
     setUser({
       ...mockUser,
+      fullName: role === "teacher" ? "Демо преподаватель" : mockUser.fullName,
       login: normalizedLogin,
-      role: "student"
+      role
     });
     setIsAuthenticated(true);
-    setActiveScreen("catalog");
+    setActiveScreen(role === "teacher" ? "teacherHome" : "catalog");
 
     void writeAuthSession({
       accessToken: createMockAccessToken(normalizedLogin),
       userLogin: normalizedLogin,
-      role: "student",
+      role,
       issuedAt: new Date().toISOString()
     });
 
     return null;
   }
 
-  function resetFlow() {
+  function resetStudentFlow() {
     setSelectedLecture(null);
     setCurrentSession(null);
     setCurrentResult(null);
   }
 
+  function resetTeacherFlow() {
+    setCurrentTeacherSession(null);
+  }
+
   function handleLogout() {
     setIsAuthenticated(false);
-    resetFlow();
+    resetStudentFlow();
+    resetTeacherFlow();
     setActiveScreen("catalog");
     void clearAuthSession();
   }
@@ -194,7 +252,7 @@ export function AppNavigation() {
   }
 
   function handleBackToCatalog() {
-    resetFlow();
+    resetStudentFlow();
     setActiveScreen("catalog");
   }
 
@@ -236,6 +294,57 @@ export function AppNavigation() {
     setActiveScreen("session");
   }
 
+  function handleOpenManageTeacherSession(lecture: LectureItem) {
+    const teacherSession = createTeacherManagedSession(lecture);
+    setCurrentTeacherSession(teacherSession);
+    setActiveScreen("teacherSession");
+  }
+
+  function handleBackToTeacherHome() {
+    resetTeacherFlow();
+    setActiveScreen("teacherHome");
+  }
+
+  function handleTeacherStartSession() {
+    if (!currentTeacherSession) {
+      return;
+    }
+
+    setCurrentTeacherSession(
+      updateTeacherSessionStatus(currentTeacherSession, "active")
+    );
+  }
+
+  function handleTeacherStopSession() {
+    if (!currentTeacherSession) {
+      return;
+    }
+
+    setCurrentTeacherSession(
+      updateTeacherSessionStatus(currentTeacherSession, "stopped")
+    );
+  }
+
+  function handleTeacherPrevBlock() {
+    if (!currentTeacherSession) {
+      return;
+    }
+
+    setCurrentTeacherSession(
+      moveTeacherSessionBlock(currentTeacherSession, "prev")
+    );
+  }
+
+  function handleTeacherNextBlock() {
+    if (!currentTeacherSession) {
+      return;
+    }
+
+    setCurrentTeacherSession(
+      moveTeacherSessionBlock(currentTeacherSession, "next")
+    );
+  }
+
   if (isHydrating) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -250,27 +359,34 @@ export function AppNavigation() {
     return <LoginScreen theme={theme} onLogin={handleLogin} />;
   }
 
-  const bottomTabScreen: "catalog" | "profile" =
-    activeScreen === "profile" ? "profile" : "catalog";
-
   const lastOpenedLecture =
     catalogLectures.find((lecture) => lecture.id === lastOpenedLectureId) ?? null;
+
+  const activeBottomTab: "catalog" | "teacher" | "profile" = isTeacher
+    ? activeScreen === "profile"
+      ? "profile"
+      : "teacher"
+    : activeScreen === "profile"
+      ? "profile"
+      : "catalog";
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.content}>
-        {activeScreen === "catalog" ? (
+        {!isTeacher && activeScreen === "catalog" ? (
           <CatalogScreen
             theme={theme}
             lectures={catalogLectures}
             lastOpenedLecture={lastOpenedLecture}
-            isOffline
-            onRetry={() => undefined}
+            isLoading={catalogMode === "loading"}
+            hasError={catalogMode === "error"}
+            isOffline={catalogMode === "offline"}
+            onRetry={() => setCatalogMode("online")}
             onOpenLecture={handleOpenLecture}
           />
         ) : null}
 
-        {activeScreen === "details" && selectedLecture ? (
+        {!isTeacher && activeScreen === "details" && selectedLecture ? (
           <LectureDetailsScreen
             theme={theme}
             lecture={selectedLecture}
@@ -279,17 +395,20 @@ export function AppNavigation() {
           />
         ) : null}
 
-        {activeScreen === "session" && selectedLecture && currentSession ? (
+        {!isTeacher && activeScreen === "session" && selectedLecture && currentSession ? (
           <SessionScreen
             theme={theme}
             lecture={selectedLecture}
             session={currentSession}
+            isOffline={sessionMode === "offline"}
+            hasError={sessionMode === "error"}
+            onRetry={() => setSessionMode("online")}
             onBack={handleBackToLecture}
             onOpenTask={handleOpenTask}
           />
         ) : null}
 
-        {activeScreen === "task" && currentSession ? (
+        {!isTeacher && activeScreen === "task" && currentSession ? (
           <TaskScreen
             theme={theme}
             session={currentSession}
@@ -298,12 +417,33 @@ export function AppNavigation() {
           />
         ) : null}
 
-        {activeScreen === "result" && currentResult ? (
+        {!isTeacher && activeScreen === "result" && currentResult ? (
           <TaskResultScreen
             theme={theme}
             result={currentResult}
             onBackToSession={handleBackToSession}
             onFinish={handleBackToLecture}
+          />
+        ) : null}
+
+        {isTeacher && activeScreen === "teacherHome" ? (
+          <TeacherHomeScreen
+            theme={theme}
+            user={user}
+            lectures={catalogLectures}
+            onOpenManageSession={handleOpenManageTeacherSession}
+          />
+        ) : null}
+
+        {isTeacher && activeScreen === "teacherSession" && currentTeacherSession ? (
+          <TeacherSessionControlScreen
+            theme={theme}
+            session={currentTeacherSession}
+            onBack={handleBackToTeacherHome}
+            onStart={handleTeacherStartSession}
+            onStop={handleTeacherStopSession}
+            onPrevBlock={handleTeacherPrevBlock}
+            onNextBlock={handleTeacherNextBlock}
           />
         ) : null}
 
@@ -313,6 +453,8 @@ export function AppNavigation() {
             user={user}
             themeMode={themeMode}
             notificationsEnabled={notificationsEnabled}
+            catalogMode={catalogMode}
+            sessionMode={sessionMode}
             onToggleTheme={() =>
               setThemeMode((currentMode) =>
                 currentMode === "light" ? "dark" : "light"
@@ -321,6 +463,12 @@ export function AppNavigation() {
             onToggleNotifications={() =>
               setNotificationsEnabled((currentValue) => !currentValue)
             }
+            onCycleCatalogMode={() =>
+              setCatalogMode((currentMode) => nextMode(currentMode))
+            }
+            onCycleSessionMode={() =>
+              setSessionMode((currentMode) => nextMode(currentMode))
+            }
             onLogout={handleLogout}
           />
         ) : null}
@@ -328,14 +476,21 @@ export function AppNavigation() {
 
       <BottomTabs
         theme={theme}
-        activeScreen={bottomTabScreen}
+        isTeacher={isTeacher}
+        activeScreen={activeBottomTab}
         onChange={(screen) => {
-          if (screen === "catalog") {
-            handleBackToCatalog();
+          if (screen === "profile") {
+            setActiveScreen("profile");
             return;
           }
 
-          setActiveScreen("profile");
+          if (screen === "teacher") {
+            resetTeacherFlow();
+            setActiveScreen("teacherHome");
+            return;
+          }
+
+          handleBackToCatalog();
         }}
       />
     </View>
@@ -344,12 +499,14 @@ export function AppNavigation() {
 
 type BottomTabsProps = {
   theme: AppTheme;
-  activeScreen: "catalog" | "profile";
-  onChange: (screen: "catalog" | "profile") => void;
+  isTeacher: boolean;
+  activeScreen: "catalog" | "teacher" | "profile";
+  onChange: (screen: "catalog" | "teacher" | "profile") => void;
 };
 
 function BottomTabs({
   theme,
+  isTeacher,
   activeScreen,
   onChange
 }: BottomTabsProps) {
@@ -363,12 +520,22 @@ function BottomTabs({
         }
       ]}
     >
-      <TabButton
-        theme={theme}
-        label="Каталог"
-        isActive={activeScreen === "catalog"}
-        onPress={() => onChange("catalog")}
-      />
+      {isTeacher ? (
+        <TabButton
+          theme={theme}
+          label="Преподаватель"
+          isActive={activeScreen === "teacher"}
+          onPress={() => onChange("teacher")}
+        />
+      ) : (
+        <TabButton
+          theme={theme}
+          label="Каталог"
+          isActive={activeScreen === "catalog"}
+          onPress={() => onChange("catalog")}
+        />
+      )}
+
       <TabButton
         theme={theme}
         label="Профиль"

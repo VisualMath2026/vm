@@ -3,8 +3,12 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../components/ui/AppButton";
+import { ErrorState } from "../components/ui/ErrorState";
+import { OfflineState } from "../components/ui/OfflineState";
 import { Screen } from "../components/ui/Screen";
+import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { SectionCard } from "../components/ui/SectionCard";
+import { StatusPill } from "../components/ui/StatusPill";
 import type { LectureItem } from "../mocks/lectures";
 import type { SessionData } from "../mocks/session";
 import type { AppTheme } from "../theme";
@@ -13,6 +17,9 @@ type SessionScreenProps = {
   theme: AppTheme;
   lecture: LectureItem;
   session: SessionData;
+  isOffline?: boolean;
+  hasError?: boolean;
+  onRetry?: () => void;
   onBack: () => void;
   onOpenTask: () => void;
 };
@@ -21,6 +28,9 @@ export function SessionScreen({
   theme,
   lecture,
   session,
+  isOffline = false,
+  hasError = false,
+  onRetry,
   onBack,
   onOpenTask
 }: SessionScreenProps) {
@@ -28,27 +38,65 @@ export function SessionScreen({
 
   return (
     <Screen theme={theme}>
-      <View style={styles.headerActions}>
-        <AppButton
-          label="Назад к лекции"
-          onPress={onBack}
+      <ScreenHeader
+        theme={theme}
+        title="Сессия занятия"
+        subtitle={lecture.title}
+        rightSlot={
+          <AppButton
+            label="Назад к лекции"
+            onPress={onBack}
+            theme={theme}
+            variant="secondary"
+          />
+        }
+      />
+
+      <View style={styles.metaRow}>
+        <StatusPill
           theme={theme}
-          variant="secondary"
+          label={`Статус: ${session.status}`}
+          tone={session.status === "active" ? "success" : "warning"}
+        />
+        <StatusPill
+          theme={theme}
+          label={`Подключение: ${isOffline ? "offline" : session.connectionStatus}`}
+          tone={isOffline ? "warning" : "info"}
+        />
+        <StatusPill
+          theme={theme}
+          label={`Участников: ${session.participantsCount}`}
+          tone="neutral"
         />
       </View>
 
-      <Text style={styles.title}>Сессия занятия</Text>
-      <Text style={styles.subtitle}>{lecture.title}</Text>
+      {isOffline ? (
+        <View style={styles.stateBlock}>
+          <OfflineState
+            theme={theme}
+            description="Сессия открыта в демо-режиме без сети. Доступен последний локальный снимок данных."
+            onRetry={onRetry}
+          />
+        </View>
+      ) : null}
+
+      {hasError ? (
+        <View style={styles.stateBlock}>
+          <ErrorState
+            theme={theme}
+            title="Ошибка загрузки состояния сессии"
+            description="Можно вернуться в лекцию или попробовать повторить получение данных."
+            onRetry={onRetry}
+          />
+        </View>
+      ) : null}
 
       <SectionCard
-        title="Состояние сессии"
+        title="Текущий блок"
         subtitle={`Код подключения: ${session.sessionCode}`}
         theme={theme}
       >
-        <Text style={styles.metaText}>Статус: {session.status}</Text>
-        <Text style={styles.metaText}>Подключение: {session.connectionStatus}</Text>
-        <Text style={styles.metaText}>Участников: {session.participantsCount}</Text>
-        <Text style={styles.metaText}>Текущий блок: {session.currentBlockTitle}</Text>
+        <Text style={styles.bodyText}>{session.currentBlockTitle}</Text>
       </SectionCard>
 
       <SectionCard
@@ -75,6 +123,7 @@ export function SessionScreen({
             label="Открыть задание"
             onPress={onOpenTask}
             theme={theme}
+            disabled={hasError}
           />
         </View>
       </SectionCard>
@@ -84,28 +133,9 @@ export function SessionScreen({
 
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
-    headerActions: {
-      marginBottom: theme.spacing.md
-    },
-    title: {
-      fontSize: theme.typography.screenTitle,
-      fontWeight: "800",
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs
-    },
-    subtitle: {
-      fontSize: theme.typography.body,
-      color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.lg
-    },
     bodyText: {
       fontSize: theme.typography.body,
       color: theme.colors.text
-    },
-    metaText: {
-      fontSize: theme.typography.body,
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs
     },
     listItem: {
       fontSize: theme.typography.body,
@@ -114,6 +144,14 @@ function createStyles(theme: AppTheme) {
     },
     actionTop: {
       marginTop: theme.spacing.md
+    },
+    metaRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginBottom: theme.spacing.sm
+    },
+    stateBlock: {
+      marginBottom: theme.spacing.md
     }
   });
 }
