@@ -20,6 +20,11 @@ import { SessionScreen } from "../screens/SessionScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
 import {
+  clearAuthSession,
+  readAuthSession,
+  writeAuthSession
+} from "../storage/authStorage";
+import {
   readCatalogSnapshot,
   readLastLectureId,
   readNotificationsEnabled,
@@ -51,18 +56,20 @@ export function AppNavigation() {
   useEffect(() => {
     let isMounted = true;
 
-    async function hydrateCache() {
+    async function hydrateAppState() {
       try {
         const [
           cachedLectures,
           cachedLastLectureId,
           cachedThemeMode,
-          cachedNotificationsEnabled
+          cachedNotificationsEnabled,
+          storedAuthSession
         ] = await Promise.all([
           readCatalogSnapshot(),
           readLastLectureId(),
           readThemeMode(),
-          readNotificationsEnabled()
+          readNotificationsEnabled(),
+          readAuthSession()
         ]);
 
         if (!isMounted) {
@@ -87,6 +94,16 @@ export function AppNavigation() {
         if (typeof cachedNotificationsEnabled === "boolean") {
           setNotificationsEnabled(cachedNotificationsEnabled);
         }
+
+        if (storedAuthSession) {
+          setUser({
+            ...mockUser,
+            login: storedAuthSession.userLogin,
+            role: storedAuthSession.role
+          });
+          setIsAuthenticated(true);
+          setActiveScreen("catalog");
+        }
       } finally {
         if (isMounted) {
           setIsHydrating(false);
@@ -94,7 +111,7 @@ export function AppNavigation() {
       }
     }
 
-    void hydrateCache();
+    void hydrateAppState();
 
     return () => {
       isMounted = false;
@@ -125,17 +142,32 @@ export function AppNavigation() {
     void writeNotificationsEnabled(notificationsEnabled);
   }, [notificationsEnabled, isHydrating]);
 
+  function createMockAccessToken(login: string) {
+    return `vm-token-${login.trim().toLowerCase()}-${Date.now()}`;
+  }
+
   function handleLogin(login: string, password: string) {
     if (!login.trim() || !password.trim()) {
       return "Введите логин и пароль.";
     }
 
+    const normalizedLogin = login.trim();
+
     setUser({
       ...mockUser,
-      login: login.trim()
+      login: normalizedLogin,
+      role: "student"
     });
     setIsAuthenticated(true);
     setActiveScreen("catalog");
+
+    void writeAuthSession({
+      accessToken: createMockAccessToken(normalizedLogin),
+      userLogin: normalizedLogin,
+      role: "student",
+      issuedAt: new Date().toISOString()
+    });
+
     return null;
   }
 
@@ -149,6 +181,7 @@ export function AppNavigation() {
     setIsAuthenticated(false);
     resetFlow();
     setActiveScreen("catalog");
+    void clearAuthSession();
   }
 
   function handleOpenLecture(lecture: LectureItem) {
@@ -207,7 +240,7 @@ export function AppNavigation() {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.centeredState}>
-          <LoadingState theme={theme} text="Восстанавливаем локальный кэш..." />
+          <LoadingState theme={theme} text="Восстанавливаем локальные данные..." />
         </View>
       </View>
     );
