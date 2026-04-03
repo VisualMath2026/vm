@@ -1,7 +1,5 @@
 import React from "react";
-
 import { StyleSheet, Text, View } from "react-native";
-
 import { AppButton } from "../components/ui/AppButton";
 import { Screen } from "../components/ui/Screen";
 import { ScreenHeader } from "../components/ui/ScreenHeader";
@@ -29,48 +27,47 @@ export function TaskResultScreen({
     <Screen theme={theme}>
       <ScreenHeader
         theme={theme}
-        title="Результат задания"
-        subtitle={
-          result.status === "timeout"
-            ? "Ответ отправлен по таймеру"
-            : "Ответ успешно отправлен"
+        title="Результаты блока"
+        subtitle="Сводка по всем задачам лекции"
+        rightSlot={
+          <View style={styles.metaRow}>
+            <StatusPill
+              theme={theme}
+              label={result.status === "timeout" ? "Время вышло" : "Отправлено"}
+              tone={result.status === "timeout" ? "warning" : "success"}
+            />
+            <StatusPill
+              theme={theme}
+              label={`${result.correctCount}/${result.totalQuestions} верно`}
+              tone="info"
+            />
+          </View>
         }
       />
 
-      <View style={styles.metaRow}>
-        <StatusPill
-          theme={theme}
-          label={result.isCorrect ? "Ответ верный" : "Ответ неверный"}
-          tone={result.isCorrect ? "success" : "danger"}
-        />
-        <StatusPill
-          theme={theme}
-          label={`Баллы: ${result.earnedPoints}/${result.maxPoints}`}
-          tone="info"
-        />
-        <StatusPill
-          theme={theme}
-          label={`Время: ${result.timeSpentSec} сек.`}
-          tone="neutral"
-        />
-      </View>
-
       <SectionCard
-        title="Ответ"
-        subtitle="Сводка по результату"
         theme={theme}
+        title="Итог"
+        subtitle="Общая оценка по проверочному блоку"
       >
-        <Text style={styles.bodyText}>Твой ответ: {result.submittedAnswerLabel}</Text>
-        <Text style={styles.bodyText}>Правильный ответ: {result.correctAnswerLabel}</Text>
+        <Text style={styles.bodyText}>Верных ответов: {result.correctCount} из {result.totalQuestions}</Text>
+        <Text style={styles.bodyText}>Баллы: {result.earnedPoints} / {result.maxPoints}</Text>
+        <Text style={styles.bodyText}>Время на выполнение: {result.timeSpentSec} сек.</Text>
       </SectionCard>
 
-      <SectionCard
-        title="Пояснение"
-        subtitle="Локальная проверка результата"
-        theme={theme}
-      >
-        <Text style={styles.bodyText}>{result.explanation}</Text>
-      </SectionCard>
+      {result.answers.map((answer, index) => (
+        <SectionCard
+          key={answer.questionId}
+          theme={theme}
+          title={`Задача ${index + 1}`}
+          subtitle={answer.isCorrect ? "Ответ верный" : "Ответ неверный"}
+        >
+          <Text style={styles.bodyText}>{answer.prompt}</Text>
+          <Text style={styles.bodyText}>Твой ответ: {answer.submittedAnswerLabel}</Text>
+          <Text style={styles.bodyText}>Правильный ответ: {answer.correctAnswerLabel}</Text>
+          <Text style={styles.bodyText}>{answer.explanation}</Text>
+        </SectionCard>
+      ))}
 
       <View style={styles.actionGroup}>
         <AppButton
@@ -83,7 +80,7 @@ export function TaskResultScreen({
 
       <View style={styles.actionGroup}>
         <AppButton
-          label="Завершить и вернуться к лекции"
+          label="Завершить и вернуться в каталог"
           onPress={onFinish}
           theme={theme}
         />

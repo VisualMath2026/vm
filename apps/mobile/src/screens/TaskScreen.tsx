@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
 import { Screen } from "../components/ui/Screen";
@@ -18,18 +16,23 @@ type TaskScreenProps = {
   onSubmit: (submission: TaskSubmission) => void;
 };
 
-export function TaskScreen({
-  theme,
-  session,
-  onBack,
-  onSubmit
-}: TaskScreenProps) {
+type DraftAnswer = {
+  selectedOptionId?: string;
+  shortAnswer?: string;
+};
+
+export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps) {
   const styles = createStyles(theme);
-  const [timeLeft, setTimeLeft] = useState(session.question.timeLimitSec);
-  const [selectedOptionId, setSelectedOptionId] = useState<string | undefined>();
-  const [shortAnswer, setShortAnswer] = useState("");
+  const initialTime = session.questions[0]?.timeLimitSec ?? 60;
+
+  const [timeLeft, setTimeLeft] = useState(initialTime);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answersByQuestionId, setAnswersByQuestionId] = useState<Record<string, DraftAnswer>>({});
   const [errorText, setErrorText] = useState("");
   const [isLocked, setIsLocked] = useState(false);
+
+  const currentQuestion = session.questions[currentIndex];
+  const currentDraft = answersByQuestionId[currentQuestion.id] ?? {};
 
   useEffect(() => {
     if (isLocked) {
@@ -37,7 +40,7 @@ export function TaskScreen({
     }
 
     const timerId = setInterval(() => {
-      setTimeLeft((current) => {
+      setTimeLeft((current: number) => {
         if (current <= 1) {
           clearInterval(timerId);
           return 0;
@@ -59,9 +62,61 @@ export function TaskScreen({
   const timerLabel = useMemo(() => {
     const minutes = Math.floor(timeLeft / 60);
     const seconds = timeLeft % 60;
-
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }, [timeLeft]);
+
+  function hasAnswer(index: number): boolean {
+    const question = session.questions[index];
+    const answer = answersByQuestionId[question.id];
+
+    if (!answer) {
+      return false;
+    }
+
+    if (question.type === "single-choice") {
+      return Boolean(answer.selectedOptionId);
+    }
+
+    return Boolean(answer.shortAnswer?.trim());
+  }
+
+  function buildSubmission(status: "submitted" | "timeout"): TaskSubmission {
+    return {
+      answers: session.questions.map((question) => {
+        const answer = answersByQuestionId[question.id] ?? {};
+
+        return {
+          questionId: question.id,
+          selectedOptionId: answer.selectedOptionId,
+          shortAnswer: answer.shortAnswer
+        };
+      }),
+      timeSpentSec: initialTime - timeLeft,
+      status
+    };
+  }
+
+  function handleSelectOption(optionId: string) {
+    setAnswersByQuestionId((current) => ({
+      ...current,
+      [currentQuestion.id]: {
+        ...current[currentQuestion.id],
+        selectedOptionId: optionId
+      }
+    }));
+    setErrorText("");
+  }
+
+  function handleShortAnswer(value: string) {
+    setAnswersByQuestionId((current) => ({
+      ...current,
+      [currentQuestion.id]: {
+        ...current[currentQuestion.id],
+        shortAnswer: value
+      }
+    }));
+    setErrorText("");
+  }
 
   function handleSubmit(status: "submitted" | "timeout") {
     if (isLocked) {
@@ -69,88 +124,68 @@ export function TaskScreen({
     }
 
     if (status === "submitted") {
-      if (session.question.type === "single-choice" && !selectedOptionId) {
-        setErrorText("Выбери один вариант ответа.");
-        return;
-      }
+      const unansweredIndex = session.questions.findIndex((_, index) => !hasAnswer(index));
 
-      if (session.question.type === "short-answer" && !shortAnswer.trim()) {
-        setErrorText("Введи ответ перед отправкой.");
+      if (unansweredIndex !== -1) {
+        setCurrentIndex(unansweredIndex);
+        setErrorText(`Заполни вопрос ${unansweredIndex + 1} из ${session.questions.length}.`);
         return;
       }
     }
 
     setErrorText("");
     setIsLocked(true);
-
-    const timeSpentSec = session.question.timeLimitSec - timeLeft;
-
-    onSubmit({
-      selectedOptionId,
-      shortAnswer,
-      timeSpentSec,
-      status
-    });
+    onSubmit(buildSubmission(status));
   }
+
+  const answeredCount = session.questions.filter((_, index) => hasAnswer(index)).length;
 
   return (
     <Screen theme={theme}>
       <ScreenHeader
         theme={theme}
-        title="Задание"
-        subtitle="Проверочный блок текущей сессии"
+        title="Проверочный блок"
+        subtitle={session.lectureTitle}
         rightSlot={
-          <AppButton
-            label="Назад к сессии"
-            onPress={onBack}
-            theme={theme}
-            variant="secondary"
-          />
+          <View style={styles.metaRow}>
+            <StatusPill
+              theme={theme}
+              label={`Вопрос ${currentIndex + 1} из ${session.questions.length}`}
+              tone="info"
+            />
+            <StatusPill
+              theme={theme}
+              label={`Готово: ${answeredCount}/${session.questions.length}`}
+              tone="success"
+            />
+          </View>
         }
       />
 
-      <View style={styles.metaRow}>
-        <StatusPill
-          theme={theme}
-          label={`Тип: ${session.question.type === "single-choice" ? "выбор" : "ответ"}`}
-          tone="info"
-        />
-        <StatusPill
-          theme={theme}
-          label={`Баллы: ${session.question.points}`}
-          tone="success"
-        />
-      </View>
-
       <SectionCard
-        title="Таймер"
-        subtitle={`Максимум: ${session.question.timeLimitSec} сек.`}
         theme={theme}
+        title="Таймер"
+        subtitle="Если время закончится, ответы отправятся автоматически"
       >
         <Text style={styles.timer}>{timerLabel}</Text>
-        <Text style={styles.metaText}>
-          Если время закончится, ответ будет отправлен автоматически.
-        </Text>
+        <Text style={styles.metaText}>Проверь все ответы перед финальной отправкой.</Text>
       </SectionCard>
 
       <SectionCard
-        title="Вопрос"
-        subtitle="Ответ фиксируется сразу после отправки"
         theme={theme}
+        title={`Задача ${currentIndex + 1}`}
+        subtitle="Последовательно ответь на все вопросы блока"
       >
-        <Text style={styles.questionText}>{session.question.prompt}</Text>
+        <Text style={styles.questionText}>{currentQuestion.prompt}</Text>
 
-        {session.question.type === "single-choice"
-          ? session.question.options?.map((option) => {
-              const isSelected = option.id === selectedOptionId;
+        {currentQuestion.type === "single-choice"
+          ? currentQuestion.options?.map((option) => {
+              const isSelected = option.id === currentDraft.selectedOptionId;
 
               return (
                 <Pressable
                   key={option.id}
-                  onPress={() => {
-                    setSelectedOptionId(option.id);
-                    setErrorText("");
-                  }}
+                  onPress={() => handleSelectOption(option.id)}
                   style={[
                     styles.optionButton,
                     {
@@ -159,42 +194,81 @@ export function TaskScreen({
                     }
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      {
-                        color: isSelected ? theme.colors.primary : theme.colors.text
-                      }
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
+                  <Text style={styles.optionText}>{option.label}</Text>
                 </Pressable>
               );
             })
           : null}
 
-        {session.question.type === "short-answer" ? (
+        {currentQuestion.type === "short-answer" ? (
           <AppInput
             label="Твой ответ"
-            value={shortAnswer}
-            onChangeText={(value) => {
-              setShortAnswer(value);
-              setErrorText("");
-            }}
+            value={currentDraft.shortAnswer ?? ""}
+            onChangeText={handleShortAnswer}
             placeholder="Введите ответ"
-            keyboardType="numeric"
             theme={theme}
           />
         ) : null}
 
         {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
+      </SectionCard>
+
+      <SectionCard
+        theme={theme}
+        title="Навигация"
+        subtitle="Можно возвращаться к предыдущим задачам и менять ответы"
+      >
+        <View style={styles.navRow}>
+          <Pressable
+            onPress={() => setCurrentIndex((current) => Math.max(0, current - 1))}
+            disabled={currentIndex === 0}
+            style={[
+              styles.navButton,
+              {
+                opacity: currentIndex === 0 ? 0.5 : 1,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface
+              }
+            ]}
+          >
+            <Text style={[styles.navButtonText, { color: theme.colors.text }]}>Назад</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() =>
+              setCurrentIndex((current) =>
+                Math.min(session.questions.length - 1, current + 1)
+              )
+            }
+            disabled={currentIndex === session.questions.length - 1}
+            style={[
+              styles.navButton,
+              {
+                opacity: currentIndex === session.questions.length - 1 ? 0.5 : 1,
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface
+              }
+            ]}
+          >
+            <Text style={[styles.navButtonText, { color: theme.colors.text }]}>Далее</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.actionGroup}>
           <AppButton
-            label="Отправить ответ"
+            label="Отправить все ответы"
             onPress={() => handleSubmit("submitted")}
             theme={theme}
+            disabled={isLocked}
+          />
+        </View>
+
+        <View style={styles.actionGroup}>
+          <AppButton
+            label="Вернуться к сессии"
+            onPress={onBack}
+            theme={theme}
+            variant="secondary"
             disabled={isLocked}
           />
         </View>
@@ -245,6 +319,23 @@ function createStyles(theme: AppTheme) {
       flexDirection: "row",
       flexWrap: "wrap",
       marginBottom: theme.spacing.sm
+    },
+    navRow: {
+      flexDirection: "row",
+      gap: theme.spacing.sm
+    },
+    navButton: {
+      flex: 1,
+      minHeight: 48,
+      borderWidth: 1,
+      borderRadius: theme.radius.md,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: theme.spacing.md
+    },
+    navButtonText: {
+      fontSize: theme.typography.body,
+      fontWeight: "700"
     }
   });
 }

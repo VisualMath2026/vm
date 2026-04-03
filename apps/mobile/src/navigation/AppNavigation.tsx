@@ -1,22 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-
-import { Pressable, StyleSheet, Text, View } from "react-native";
-
-import { LoadingState } from "../components/ui/LoadingState";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View
+} from "react-native";
+import type { LectureDetails } from "@vm/shared";
+import { createMockSession, evaluateSubmission, type SessionData, type TaskResult, type TaskSubmission } from "../mocks/session";
+import { createTeacherManagedSession, moveTeacherSessionBlock, updateTeacherSessionStatus, type TeacherManagedSession } from "../mocks/teacher";
 import { mockLectures, type LectureItem } from "../mocks/lectures";
-import {
-  createMockSession,
-  evaluateSubmission,
-  type SessionData,
-  type TaskResult,
-  type TaskSubmission
-} from "../mocks/session";
-import {
-  createTeacherManagedSession,
-  moveTeacherSessionBlock,
-  updateTeacherSessionStatus,
-  type TeacherManagedSession
-} from "../mocks/teacher";
 import { mockUser, type UserProfile } from "../mocks/user";
 import { CatalogScreen } from "../screens/CatalogScreen";
 import { LectureDetailsScreen } from "../screens/LectureDetailsScreen";
@@ -29,8 +22,8 @@ import { TeacherHomeScreen } from "../screens/TeacherHomeScreen";
 import { TeacherSessionControlScreen } from "../screens/TeacherSessionControlScreen";
 import {
   clearAuthSession,
-  readAuthSession,
-  writeAuthSession
+  readAuthMeta,
+  writeAuthMeta
 } from "../storage/authStorage";
 import {
   readCatalogSnapshot,
@@ -43,6 +36,15 @@ import {
   writeThemeMode
 } from "../storage/mobileCache";
 import { createAppTheme, type AppTheme, type ThemeMode } from "../theme";
+import { authApi, catalogApi, quizApi, sessionApi, toUserMessage } from "../api/mobileApi";
+import {
+  mapLectureDetailsToLectureItem,
+  mapLectureSummaryToLectureItem,
+  mapQuizResponseToTaskResult,
+  mapSessionToSessionData,
+  mapSessionToTeacherManagedSession,
+  mapTaskAnswerToApiPayload
+} from "../api/mappers";
 
 type ScreenKey =
   | "catalog"
@@ -57,20 +59,51 @@ type ScreenKey =
 type LoginRole = "student" | "teacher";
 type DemoDataMode = "online" | "offline" | "loading" | "error";
 
+function nextMode(currentMode: DemoDataMode): DemoDataMode {
+  if (currentMode === "online") {
+    return "offline";
+  }
+
+  if (currentMode === "offline") {
+    return "loading";
+  }
+
+  if (currentMode === "loading") {
+    return "error";
+  }
+
+  return "online";
+}
+
+function upsertLecture(lectures: LectureItem[], lecture: LectureItem): LectureItem[] {
+  const existingIndex = lectures.findIndex((item) => item.id === lecture.id);
+
+  if (existingIndex === -1) {
+    return [...lectures, lecture];
+  }
+
+  const next = [...lectures];
+  next[existingIndex] = lecture;
+  return next;
+}
+
 export function AppNavigation() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeScreen, setActiveScreen] = useState<ScreenKey>("catalog");
+
   const [user, setUser] = useState<UserProfile>(mockUser);
   const [catalogLectures, setCatalogLectures] = useState<LectureItem[]>(mockLectures);
   const [selectedLecture, setSelectedLecture] = useState<LectureItem | null>(null);
   const [lastOpenedLectureId, setLastOpenedLectureId] = useState<string | null>(null);
+
+  const [lectureDetailsById, setLectureDetailsById] = useState<Record<string, LectureDetails>>({});
   const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
   const [currentResult, setCurrentResult] = useState<TaskResult | null>(null);
-  const [currentTeacherSession, setCurrentTeacherSession] =
-    useState<TeacherManagedSession | null>(null);
-  const [catalogMode, setCatalogMode] = useState<DemoDataMode>("offline");
+  const [currentTeacherSession, setCurrentTeacherSession] = useState<TeacherManagedSession | null>(null);
+
+  const [catalogMode, setCatalogMode] = useState<DemoDataMode>("loading");
   const [sessionMode, setSessionMode] = useState<DemoDataMode>("online");
   const [isHydrating, setIsHydrating] = useState(true);
 
@@ -87,13 +120,13 @@ export function AppNavigation() {
           cachedLastLectureId,
           cachedThemeMode,
           cachedNotificationsEnabled,
-          storedAuthSession
+          storedAuthMeta
         ] = await Promise.all([
           readCatalogSnapshot(),
           readLastLectureId(),
           readThemeMode(),
           readNotificationsEnabled(),
-          readAuthSession()
+          readAuthMeta()
         ]);
 
         if (!isMounted) {
@@ -102,9 +135,9 @@ export function AppNavigation() {
 
         if (cachedLectures && cachedLectures.length > 0) {
           setCatalogLectures(cachedLectures);
+          setCatalogMode("offline");
         } else {
           setCatalogLectures(mockLectures);
-          await writeCatalogSnapshot(mockLectures);
         }
 
         if (cachedLastLectureId) {
@@ -119,22 +152,37 @@ export function AppNavigation() {
           setNotificationsEnabled(cachedNotificationsEnabled);
         }
 
-        if (storedAuthSession) {
+        if (storedAuthMeta?.userLogin) {
           setUser({
-            ...mockUser,
-            fullName:
-              storedAuthSession.role === "teacher"
-                ? "Демо преподаватель"
-                : mockUser.fullName,
-            login: storedAuthSession.userLogin,
-            role: storedAuthSession.role
+            fullName: storedAuthMeta.fullName || mockUser.fullName,
+            login: storedAuthMeta.userLogin,
+            role: storedAuthMeta.role,
+            group: storedAuthMeta.group || mockUser.group
           });
           setIsAuthenticated(true);
-          setActiveScreen(
-            storedAuthSession.role === "teacher"
-              ? "teacherHome"
-              : "catalog"
-          );
+          setActiveScreen(storedAuthMeta.role === "teacher" ? "teacherHome" : "catalog");
+
+          try {
+            const summaries = await catalogApi.listLectures();
+            if (!isMounted) {
+              return;
+            }
+
+            const nextLectures = summaries.map((summary) =>
+              mapLectureSummaryToLectureItem(
+                summary,
+                cachedLectures?.find((item) => item.id === summary.id)
+              )
+            );
+
+            setCatalogLectures(nextLectures);
+            setCatalogMode("online");
+            await writeCatalogSnapshot(nextLectures);
+          } catch {
+            setCatalogMode(cachedLectures?.length ? "offline" : "error");
+          }
+        } else {
+          setCatalogMode(cachedLectures?.length ? "offline" : "error");
         }
       } finally {
         if (isMounted) {
@@ -174,81 +222,126 @@ export function AppNavigation() {
     void writeNotificationsEnabled(notificationsEnabled);
   }, [notificationsEnabled, isHydrating]);
 
-  function createMockAccessToken(login: string) {
-    return `vm-token-${login.trim().toLowerCase()}-${Date.now()}`;
+  async function refreshCatalogFromApi() {
+    setCatalogMode("loading");
+
+    try {
+      const summaries = await catalogApi.listLectures();
+
+      const nextLectures = summaries.map((summary) =>
+        mapLectureSummaryToLectureItem(
+          summary,
+          catalogLectures.find((item) => item.id === summary.id)
+        )
+      );
+
+      setCatalogLectures(nextLectures);
+      setCatalogMode("online");
+      await writeCatalogSnapshot(nextLectures);
+    } catch {
+      setCatalogMode(catalogLectures.length > 0 ? "offline" : "error");
+    }
   }
 
-  function nextMode(currentMode: DemoDataMode): DemoDataMode {
-    if (currentMode === "online") {
-      return "offline";
+  async function ensureLectureDetails(lecture: LectureItem): Promise<LectureDetails | null> {
+    const cachedDetails = lectureDetailsById[lecture.id];
+    if (cachedDetails) {
+      return cachedDetails;
     }
 
-    if (currentMode === "offline") {
-      return "loading";
-    }
+    try {
+      const details = await catalogApi.getLecture(lecture.id);
 
-    if (currentMode === "loading") {
-      return "error";
-    }
+      setLectureDetailsById((current) => ({
+        ...current,
+        [lecture.id]: details
+      }));
 
-    return "online";
+      const mappedLecture = mapLectureDetailsToLectureItem(details, lecture);
+      setCatalogLectures((current) => upsertLecture(current, mappedLecture));
+      setSelectedLecture(mappedLecture);
+
+      return details;
+    } catch {
+      return null;
+    }
   }
 
-  function handleLogin(
+  async function handleLogin(
     login: string,
     password: string,
     role: LoginRole
-  ) {
+  ): Promise<string | null> {
     if (!login.trim() || !password.trim()) {
-      return "Введите логин и пароль.";
+      return "Р’РІРµРґРёС‚Рµ Р»РѕРіРёРЅ Рё РїР°СЂРѕР»СЊ.";
     }
 
-    const normalizedLogin = login.trim();
+    try {
+      await authApi.login(login.trim(), password.trim());
 
-    setUser({
-      ...mockUser,
-      fullName: role === "teacher" ? "Демо преподаватель" : mockUser.fullName,
-      login: normalizedLogin,
-      role
-    });
-    setIsAuthenticated(true);
-    setActiveScreen(role === "teacher" ? "teacherHome" : "catalog");
+      const nextUser: UserProfile = {
+        fullName: role === "teacher" ? "РўРµСЃС‚РѕРІС‹Р№ РїСЂРµРїРѕРґР°РІР°С‚РµР»СЊ" : "РўРµСЃС‚РѕРІС‹Р№ СЃС‚СѓРґРµРЅС‚",
+        login: login.trim(),
+        role,
+        group: mockUser.group
+      };
 
-    void writeAuthSession({
-      accessToken: createMockAccessToken(normalizedLogin),
-      userLogin: normalizedLogin,
-      role,
-      issuedAt: new Date().toISOString()
-    });
+      await writeAuthMeta({
+        userLogin: nextUser.login,
+        role,
+        fullName: nextUser.fullName,
+        group: nextUser.group
+      });
 
-    return null;
+      setUser(nextUser);
+      setIsAuthenticated(true);
+      setActiveScreen(role === "teacher" ? "teacherHome" : "catalog");
+
+      await refreshCatalogFromApi();
+      return null;
+    } catch (error) {
+      return toUserMessage(error);
+    }
   }
 
   function resetStudentFlow() {
     setSelectedLecture(null);
     setCurrentSession(null);
     setCurrentResult(null);
+    setSessionMode("online");
   }
 
   function resetTeacherFlow() {
     setCurrentTeacherSession(null);
   }
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      await authApi.logout();
+    } catch {
+    }
+
+    await clearAuthSession();
+
     setIsAuthenticated(false);
     resetStudentFlow();
     resetTeacherFlow();
     setActiveScreen("catalog");
-    void clearAuthSession();
+    setUser(mockUser);
   }
 
-  function handleOpenLecture(lecture: LectureItem) {
+  async function handleOpenLecture(lecture: LectureItem) {
     setSelectedLecture(lecture);
     setLastOpenedLectureId(lecture.id);
     void writeLastLectureId(lecture.id);
     setCurrentSession(null);
     setCurrentResult(null);
     setActiveScreen("details");
+
+    const details = await ensureLectureDetails(lecture);
+    if (!details) {
+      setCatalogMode("offline");
+    }
   }
 
   function handleBackToCatalog() {
@@ -256,15 +349,42 @@ export function AppNavigation() {
     setActiveScreen("catalog");
   }
 
-  function handleOpenSession() {
+  async function handleOpenSession() {
     if (!selectedLecture) {
       return;
     }
 
-    const session = createMockSession(selectedLecture);
-    setCurrentSession(session);
-    setCurrentResult(null);
-    setActiveScreen("session");
+    setSessionMode("loading");
+
+    try {
+      const details =
+        lectureDetailsById[selectedLecture.id] ?? (await ensureLectureDetails(selectedLecture));
+
+      if (!details) {
+        throw new Error("Lecture details are unavailable");
+      }
+
+      const created = await sessionApi.createSession(selectedLecture.id);
+      const sessionState = await sessionApi.getSession(created.sessionId);
+
+      const mappedLecture = mapLectureDetailsToLectureItem(details, selectedLecture);
+      const mappedSession = mapSessionToSessionData({
+        lecture: mappedLecture,
+        details,
+        sessionState
+      });
+
+      setSelectedLecture(mappedLecture);
+      setCurrentSession(mappedSession);
+      setCurrentResult(null);
+      setSessionMode("online");
+      setActiveScreen("session");
+    } catch {
+      setCurrentSession(createMockSession(selectedLecture));
+      setCurrentResult(null);
+      setSessionMode("error");
+      setActiveScreen("session");
+    }
   }
 
   function handleBackToLecture() {
@@ -280,13 +400,58 @@ export function AppNavigation() {
     setActiveScreen("task");
   }
 
-  function handleSubmitTask(submission: TaskSubmission) {
-    if (!currentSession) {
+  async function handleSubmitTask(submission: TaskSubmission) {
+    if (!currentSession || !selectedLecture) {
       return;
     }
 
-    const result = evaluateSubmission(currentSession, submission);
-    setCurrentResult(result);
+    const details =
+      lectureDetailsById[selectedLecture.id] ?? (await ensureLectureDetails(selectedLecture));
+
+    if (!details) {
+      const fallbackResult = evaluateSubmission(currentSession, submission);
+      setCurrentResult(fallbackResult);
+      setActiveScreen("result");
+      return;
+    }
+
+    try {
+      const quizBlockId =
+        details.blocks.find((block) => block.type === "quiz")?.id ??
+        details.blocks[0]?.id ??
+        "";
+
+      const apiAnswers = currentSession.questions.map((question) => {
+        const answer =
+          submission.answers.find((item) => item.questionId === question.id) ??
+          { questionId: question.id };
+
+        return {
+          questionId: question.id,
+          payload: mapTaskAnswerToApiPayload(question, answer)
+        };
+      });
+
+      const response = await quizApi.submit({
+        sessionId: currentSession.sessionId,
+        blockId: quizBlockId,
+        answers: apiAnswers
+      });
+
+      const result = mapQuizResponseToTaskResult({
+        session: currentSession,
+        submission,
+        response
+      });
+
+      setCurrentResult(result);
+      setSessionMode("online");
+    } catch {
+      const fallbackResult = evaluateSubmission(currentSession, submission);
+      setCurrentResult(fallbackResult);
+      setSessionMode("error");
+    }
+
     setActiveScreen("result");
   }
 
@@ -294,10 +459,31 @@ export function AppNavigation() {
     setActiveScreen("session");
   }
 
-  function handleOpenManageTeacherSession(lecture: LectureItem) {
-    const teacherSession = createTeacherManagedSession(lecture);
-    setCurrentTeacherSession(teacherSession);
-    setActiveScreen("teacherSession");
+  async function handleOpenManageTeacherSession(lecture: LectureItem) {
+    try {
+      const details =
+        lectureDetailsById[lecture.id] ?? (await ensureLectureDetails(lecture));
+
+      if (!details) {
+        throw new Error("Lecture details are unavailable");
+      }
+
+      const created = await sessionApi.createSession(lecture.id);
+      const sessionState = await sessionApi.getSession(created.sessionId);
+
+      const mappedLecture = mapLectureDetailsToLectureItem(details, lecture);
+      const teacherSession = mapSessionToTeacherManagedSession({
+        lecture: mappedLecture,
+        sessionState
+      });
+
+      setCurrentTeacherSession(teacherSession);
+      setActiveScreen("teacherSession");
+    } catch {
+      const fallbackSession = createTeacherManagedSession(lecture);
+      setCurrentTeacherSession(fallbackSession);
+      setActiveScreen("teacherSession");
+    }
   }
 
   function handleBackToTeacherHome() {
@@ -310,9 +496,7 @@ export function AppNavigation() {
       return;
     }
 
-    setCurrentTeacherSession(
-      updateTeacherSessionStatus(currentTeacherSession, "active")
-    );
+    setCurrentTeacherSession(updateTeacherSessionStatus(currentTeacherSession, "active"));
   }
 
   function handleTeacherStopSession() {
@@ -320,37 +504,61 @@ export function AppNavigation() {
       return;
     }
 
-    setCurrentTeacherSession(
-      updateTeacherSessionStatus(currentTeacherSession, "stopped")
-    );
+    setCurrentTeacherSession(updateTeacherSessionStatus(currentTeacherSession, "stopped"));
   }
 
-  function handleTeacherPrevBlock() {
+  async function handleTeacherMoveBlock(direction: "prev" | "next") {
     if (!currentTeacherSession) {
       return;
     }
 
-    setCurrentTeacherSession(
-      moveTeacherSessionBlock(currentTeacherSession, "prev")
-    );
-  }
+    const details = lectureDetailsById[currentTeacherSession.lectureId];
 
-  function handleTeacherNextBlock() {
-    if (!currentTeacherSession) {
+    if (!details) {
+      setCurrentTeacherSession(moveTeacherSessionBlock(currentTeacherSession, direction));
       return;
     }
 
-    setCurrentTeacherSession(
-      moveTeacherSessionBlock(currentTeacherSession, "next")
-    );
+    const nextIndex =
+      direction === "next"
+        ? Math.min(currentTeacherSession.currentBlockIndex + 1, details.blocks.length - 1)
+        : Math.max(currentTeacherSession.currentBlockIndex - 1, 0);
+
+    const nextBlock = details.blocks[nextIndex];
+    if (!nextBlock) {
+      return;
+    }
+
+    try {
+      await sessionApi.setActiveBlock(currentTeacherSession.sessionId, nextBlock.id);
+      setCurrentTeacherSession({
+        ...currentTeacherSession,
+        currentBlockIndex: nextIndex
+      });
+    } catch {
+      setCurrentTeacherSession(moveTeacherSessionBlock(currentTeacherSession, direction));
+    }
+  }
+
+  function handleBottomTabChange(screen: "catalog" | "teacher" | "profile") {
+    if (screen === "profile") {
+      setActiveScreen("profile");
+      return;
+    }
+
+    if (screen === "teacher") {
+      resetTeacherFlow();
+      setActiveScreen("teacherHome");
+      return;
+    }
+
+    handleBackToCatalog();
   }
 
   if (isHydrating) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <View style={styles.centeredState}>
-          <LoadingState theme={theme} text="Восстанавливаем локальные данные..." />
-        </View>
+      <View style={styles.centeredState}>
+        <ActivityIndicator size="large" />
       </View>
     );
   }
@@ -371,7 +579,7 @@ export function AppNavigation() {
       : "catalog";
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
       <View style={styles.content}>
         {!isTeacher && activeScreen === "catalog" ? (
           <CatalogScreen
@@ -381,8 +589,8 @@ export function AppNavigation() {
             isLoading={catalogMode === "loading"}
             hasError={catalogMode === "error"}
             isOffline={catalogMode === "offline"}
-            onRetry={() => setCatalogMode("online")}
-            onOpenLecture={handleOpenLecture}
+            onRetry={() => void refreshCatalogFromApi()}
+            onOpenLecture={(lecture) => void handleOpenLecture(lecture)}
           />
         ) : null}
 
@@ -391,7 +599,7 @@ export function AppNavigation() {
             theme={theme}
             lecture={selectedLecture}
             onBack={handleBackToCatalog}
-            onOpenSession={handleOpenSession}
+            onOpenSession={() => void handleOpenSession()}
           />
         ) : null}
 
@@ -402,7 +610,7 @@ export function AppNavigation() {
             session={currentSession}
             isOffline={sessionMode === "offline"}
             hasError={sessionMode === "error"}
-            onRetry={() => setSessionMode("online")}
+            onRetry={() => void handleOpenSession()}
             onBack={handleBackToLecture}
             onOpenTask={handleOpenTask}
           />
@@ -413,7 +621,7 @@ export function AppNavigation() {
             theme={theme}
             session={currentSession}
             onBack={handleBackToSession}
-            onSubmit={handleSubmitTask}
+            onSubmit={(submission) => void handleSubmitTask(submission)}
           />
         ) : null}
 
@@ -422,7 +630,7 @@ export function AppNavigation() {
             theme={theme}
             result={currentResult}
             onBackToSession={handleBackToSession}
-            onFinish={handleBackToLecture}
+            onFinish={handleBackToCatalog}
           />
         ) : null}
 
@@ -431,7 +639,7 @@ export function AppNavigation() {
             theme={theme}
             user={user}
             lectures={catalogLectures}
-            onOpenManageSession={handleOpenManageTeacherSession}
+            onOpenManageSession={(lecture) => void handleOpenManageTeacherSession(lecture)}
           />
         ) : null}
 
@@ -442,8 +650,8 @@ export function AppNavigation() {
             onBack={handleBackToTeacherHome}
             onStart={handleTeacherStartSession}
             onStop={handleTeacherStopSession}
-            onPrevBlock={handleTeacherPrevBlock}
-            onNextBlock={handleTeacherNextBlock}
+            onPrevBlock={() => void handleTeacherMoveBlock("prev")}
+            onNextBlock={() => void handleTeacherMoveBlock("next")}
           />
         ) : null}
 
@@ -469,7 +677,7 @@ export function AppNavigation() {
             onCycleSessionMode={() =>
               setSessionMode((currentMode) => nextMode(currentMode))
             }
-            onLogout={handleLogout}
+            onLogout={() => void handleLogout()}
           />
         ) : null}
       </View>
@@ -478,20 +686,7 @@ export function AppNavigation() {
         theme={theme}
         isTeacher={isTeacher}
         activeScreen={activeBottomTab}
-        onChange={(screen) => {
-          if (screen === "profile") {
-            setActiveScreen("profile");
-            return;
-          }
-
-          if (screen === "teacher") {
-            resetTeacherFlow();
-            setActiveScreen("teacherHome");
-            return;
-          }
-
-          handleBackToCatalog();
-        }}
+        onChange={handleBottomTabChange}
       />
     </View>
   );
@@ -523,14 +718,14 @@ function BottomTabs({
       {isTeacher ? (
         <TabButton
           theme={theme}
-          label="Преподаватель"
+          label="РџСЂРµРїРѕРґР°РІР°С‚РµР»СЊ"
           isActive={activeScreen === "teacher"}
           onPress={() => onChange("teacher")}
         />
       ) : (
         <TabButton
           theme={theme}
-          label="Каталог"
+          label="РљР°С‚Р°Р»РѕРі"
           isActive={activeScreen === "catalog"}
           onPress={() => onChange("catalog")}
         />
@@ -538,7 +733,7 @@ function BottomTabs({
 
       <TabButton
         theme={theme}
-        label="Профиль"
+        label="РџСЂРѕС„РёР»СЊ"
         isActive={activeScreen === "profile"}
         onPress={() => onChange("profile")}
       />
@@ -553,21 +748,14 @@ type TabButtonProps = {
   onPress: () => void;
 };
 
-function TabButton({
-  theme,
-  label,
-  isActive,
-  onPress
-}: TabButtonProps) {
+function TabButton({ theme, label, isActive, onPress }: TabButtonProps) {
   return (
     <Pressable
       onPress={onPress}
       style={[
         styles.tabButton,
         {
-          backgroundColor: isActive
-            ? theme.colors.surfaceMuted
-            : "transparent"
+          backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface
         }
       ]}
     >
@@ -575,9 +763,7 @@ function TabButton({
         style={[
           styles.tabLabel,
           {
-            color: isActive
-              ? theme.colors.primary
-              : theme.colors.textSecondary
+            color: isActive ? theme.colors.primary : theme.colors.textSecondary
           }
         ]}
       >
@@ -596,7 +782,8 @@ const styles = StyleSheet.create({
   },
   centeredState: {
     flex: 1,
-    justifyContent: "center"
+    justifyContent: "center",
+    alignItems: "center"
   },
   tabBar: {
     flexDirection: "row",

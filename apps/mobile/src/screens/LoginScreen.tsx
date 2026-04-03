@@ -1,7 +1,5 @@
-import React, { useState } from "react";
-
+﻿import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
 import { Screen } from "../components/ui/Screen";
@@ -16,13 +14,10 @@ type LoginScreenProps = {
     login: string,
     password: string,
     role: LoginRole
-  ) => string | null;
+  ) => Promise<string | null>;
 };
 
-export function LoginScreen({
-  theme,
-  onLogin
-}: LoginScreenProps) {
+export function LoginScreen({ theme, onLogin }: LoginScreenProps) {
   const styles = createStyles(theme);
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
@@ -30,34 +25,63 @@ export function LoginScreen({
   const [errorText, setErrorText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit() {
-    setIsSubmitting(true);
-    const maybeError = onLogin(login, password, selectedRole);
-
-    if (maybeError) {
-      setErrorText(maybeError);
-      setIsSubmitting(false);
+  async function handleSubmit() {
+    if (isSubmitting) {
       return;
     }
 
-    setErrorText("");
-    setIsSubmitting(false);
+    setIsSubmitting(true);
+
+    try {
+      const maybeError = await onLogin(login, password, selectedRole);
+
+      if (maybeError) {
+        setErrorText(maybeError);
+        return;
+      }
+
+      setErrorText("");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
-    <Screen theme={theme}>
+    <Screen theme={theme} scrollable={false}>
       <View style={styles.container}>
         <Text style={styles.logo}>VisualMath</Text>
         <Text style={styles.title}>Вход в VM Mobile</Text>
         <Text style={styles.subtitle}>
-          Выбери роль и войди в локальный demo-сценарий приложения.
+          Выбери роль и войди в приложение через API VM Server.
         </Text>
 
         <SectionCard
-          title="Роль пользователя"
-          subtitle="Сейчас доступны два режима интерфейса."
           theme={theme}
+          title="Авторизация"
+          subtitle="Для mock server используй student/student или teacher/teacher"
         >
+          <AppInput
+            label="Логин"
+            value={login}
+            onChangeText={setLogin}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="Введите логин"
+            theme={theme}
+          />
+
+          <AppInput
+            label="Пароль"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="Введите пароль"
+            theme={theme}
+            error={errorText || undefined}
+          />
+
           <View style={styles.roleRow}>
             <RoleButton
               theme={theme}
@@ -72,48 +96,18 @@ export function LoginScreen({
               onPress={() => setSelectedRole("teacher")}
             />
           </View>
-        </SectionCard>
 
-        <SectionCard
-          title="Авторизация"
-          subtitle="Пока это локальная UI-заглушка без реального API."
-          theme={theme}
-        >
-          <AppInput
-            label="Логин"
-            value={login}
-            onChangeText={setLogin}
-            placeholder="Введите логин"
-            autoCapitalize="none"
-            theme={theme}
-          />
-
-          <AppInput
-            label="Пароль"
-            value={password}
-            onChangeText={setPassword}
-            placeholder="Введите пароль"
-            secureTextEntry
-            theme={theme}
-            error={errorText || undefined}
-          />
+          <Text style={styles.helperText}>
+            Роль преподавателя открывает экран управления сессией.
+          </Text>
 
           <AppButton
             label={isSubmitting ? "Входим..." : "Войти"}
-            onPress={handleSubmit}
+            onPress={() => void handleSubmit()}
             theme={theme}
             disabled={isSubmitting}
+            style={{ marginTop: theme.spacing.lg }}
           />
-        </SectionCard>
-
-        <SectionCard
-          title="Демо"
-          subtitle="Для локального входа сейчас подойдет любой непустой логин и пароль."
-          theme={theme}
-        >
-          <Text style={styles.helperText}>
-            Роль преподавателя открывает mock-экран управления сессией.
-          </Text>
         </SectionCard>
       </View>
     </Screen>
@@ -127,12 +121,7 @@ type RoleButtonProps = {
   onPress: () => void;
 };
 
-function RoleButton({
-  theme,
-  label,
-  isActive,
-  onPress
-}: RoleButtonProps) {
+function RoleButton({ theme, label, isActive, onPress }: RoleButtonProps) {
   const styles = createStyles(theme);
 
   return (
@@ -141,12 +130,8 @@ function RoleButton({
       style={[
         styles.roleButton,
         {
-          backgroundColor: isActive
-            ? theme.colors.surfaceMuted
-            : theme.colors.surface,
-          borderColor: isActive
-            ? theme.colors.primary
-            : theme.colors.border
+          backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface,
+          borderColor: isActive ? theme.colors.primary : theme.colors.border
         }
       ]}
     >
@@ -154,9 +139,7 @@ function RoleButton({
         style={[
           styles.roleButtonText,
           {
-            color: isActive
-              ? theme.colors.primary
-              : theme.colors.text
+            color: isActive ? theme.colors.primary : theme.colors.text
           }
         ]}
       >
@@ -194,7 +177,8 @@ function createStyles(theme: AppTheme) {
     },
     helperText: {
       fontSize: theme.typography.body,
-      color: theme.colors.textSecondary
+      color: theme.colors.textSecondary,
+      marginTop: theme.spacing.md
     },
     roleRow: {
       flexDirection: "row",
