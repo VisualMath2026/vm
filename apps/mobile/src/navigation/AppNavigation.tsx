@@ -280,7 +280,10 @@ export function AppNavigation() {
       await authApi.login(login.trim(), password.trim());
 
       const nextUser: UserProfile = {
-        fullName: role === "teacher" ? "РўРµСЃС‚РѕРІС‹Р№ РїСЂРµРїРѕРґР°РІР°С‚РµР»СЊ" : "РўРµСЃС‚РѕРІС‹Р№ СЃС‚СѓРґРµРЅС‚",
+        fullName:
+          role === "teacher"
+            ? "\u0422\u0435\u0441\u0442\u043e\u0432\u044b\u0439 \u043f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044c"
+            : "\u0422\u0435\u0441\u0442\u043e\u0432\u044b\u0439 \u0441\u0442\u0443\u0434\u0435\u043d\u0442",
         login: login.trim(),
         role,
         group: mockUser.group
@@ -598,6 +601,7 @@ export function AppNavigation() {
           <LectureDetailsScreen
             theme={theme}
             lecture={selectedLecture}
+            lectureDetails={lectureDetailsById[selectedLecture.id] ?? null}
             onBack={handleBackToCatalog}
             onOpenSession={() => void handleOpenSession()}
           />
@@ -718,14 +722,14 @@ function BottomTabs({
       {isTeacher ? (
         <TabButton
           theme={theme}
-          label="РџСЂРµРїРѕРґР°РІР°С‚РµР»СЊ"
+          label={String.fromCharCode(0x041F,0x0440,0x0435,0x043F,0x043E,0x0434,0x0430,0x0432,0x0430,0x0442,0x0435,0x043B,0x044C)}
           isActive={activeScreen === "teacher"}
           onPress={() => onChange("teacher")}
         />
       ) : (
         <TabButton
           theme={theme}
-          label="РљР°С‚Р°Р»РѕРі"
+          label={String.fromCharCode(0x041A,0x0430,0x0442,0x0430,0x043B,0x043E,0x0433)}
           isActive={activeScreen === "catalog"}
           onPress={() => onChange("catalog")}
         />
@@ -733,7 +737,7 @@ function BottomTabs({
 
       <TabButton
         theme={theme}
-        label="РџСЂРѕС„РёР»СЊ"
+        label={String.fromCharCode(0x041F,0x0440,0x043E,0x0444,0x0438,0x043B,0x044C)}
         isActive={activeScreen === "profile"}
         onPress={() => onChange("profile")}
       />
