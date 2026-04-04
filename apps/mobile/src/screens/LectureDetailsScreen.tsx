@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { LectureDetails, LectureBlock, QuizBlock, TextBlock, VisualBlock } from "@vm/shared";
 import { AppButton } from "../components/ui/AppButton";
@@ -6,6 +6,7 @@ import { Screen } from "../components/ui/Screen";
 import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { SectionCard } from "../components/ui/SectionCard";
 import { StatusPill } from "../components/ui/StatusPill";
+import { VisualModuleFallback } from "../components/visual/VisualModuleFallback";
 import type { LectureItem } from "../mocks/lectures";
 import type { AppTheme } from "../theme";
 
@@ -32,12 +33,11 @@ export function LectureDetailsScreen({
       <ScreenHeader
         theme={theme}
         title={lecture.title}
-        subtitle={lecture.description}
+        subtitle={lecture.subject}
         rightSlot={
           <View style={styles.metaRow}>
-            <StatusPill theme={theme} label={lecture.subject} tone="info" />
-            <StatusPill theme={theme} label={lecture.level} tone="neutral" />
-            <StatusPill theme={theme} label={lecture.estimatedDuration} tone="success" />
+            <StatusPill theme={theme} label={lecture.level} tone="info" />
+            <StatusPill theme={theme} label={lecture.estimatedDuration} tone="neutral" />
           </View>
         }
       />
@@ -45,8 +45,9 @@ export function LectureDetailsScreen({
       <SectionCard
         theme={theme}
         title="О лекции"
-        subtitle="Основная информация и требования к участию"
+        subtitle="Краткая информация перед входом в занятие"
       >
+        <Text style={styles.bodyText}>{lecture.description}</Text>
         <Text style={styles.bodyText}>Автор: {lecture.author}</Text>
         <Text style={styles.bodyText}>Семестр: {lecture.semester}</Text>
         <Text style={styles.bodyText}>Теги: {lecture.tags.join(", ")}</Text>
@@ -60,68 +61,48 @@ export function LectureDetailsScreen({
         </View>
       </SectionCard>
 
-      {blocks.length > 0 ? (
-        <>
-          <SectionCard
-            theme={theme}
-            title="Содержимое лекции"
-            subtitle={`Загружено блоков: ${blocks.length}`}
-          >
-            {blocks.map((block, index) => (
-              <Text key={block.id} style={styles.listItem}>
-                {index + 1}. {block.title || blockLabel(block)}
-              </Text>
-            ))}
-          </SectionCard>
-
-          {blocks.map((block, index) => (
-            <BlockPreview
-              key={block.id}
-              theme={theme}
-              block={block}
-              index={index}
-            />
-          ))}
-        </>
-      ) : (
-        <SectionCard
-          theme={theme}
-          title="Структура лекции"
-          subtitle="Пока показана локальная версия без детального контента"
-        >
-          {lecture.blocks.map((block, index) => (
-            <Text key={`${block}-${index}`} style={styles.listItem}>
-              {index + 1}. {block}
-            </Text>
-          ))}
-        </SectionCard>
-      )}
-
       <SectionCard
         theme={theme}
-        title="Следующий шаг"
-        subtitle="После открытия сессии станет доступен проверочный блок"
+        title="Структура лекции"
+        subtitle="Список блоков и их preview"
       >
-        <Text style={styles.bodyText}>
+        {blocks.length > 0 ? (
+          <>
+            {blocks.map((block, index) => (
+              <View key={`${block.type}-${index}`} style={styles.topSpacing}>
+                <Text style={styles.bodyText}>
+                  {index + 1}. {block.title || blockLabel(block)}
+                </Text>
+              </View>
+            ))}
+
+            {blocks.map((block, index) => (
+              <View key={`preview-${block.type}-${index}`} style={styles.topSpacing}>
+                <BlockPreview theme={theme} block={block} index={index} />
+              </View>
+            ))}
+          </>
+        ) : (
+          <>
+            {lecture.blocks.map((block, index) => (
+              <Text key={`${block}-${index}`} style={styles.listItem}>
+                {index + 1}. {block}
+              </Text>
+            ))}
+          </>
+        )}
+
+        <View style={styles.actionTop}>
+          <AppButton label="Открыть занятие" onPress={onOpenSession} theme={theme} />
+        </View>
+
+        <View style={styles.actionTop}>
+          <AppButton label="Назад" onPress={onBack} theme={theme} variant="secondary" />
+        </View>
+
+        <Text style={styles.noteText}>
           Можно перейти к сессии, просмотреть активный блок и пройти все задания лекции.
         </Text>
-
-        <View style={styles.actionTop}>
-          <AppButton
-            label="Открыть сессию"
-            onPress={onOpenSession}
-            theme={theme}
-          />
-        </View>
-
-        <View style={styles.actionTop}>
-          <AppButton
-            label="Назад к каталогу"
-            onPress={onBack}
-            theme={theme}
-            variant="secondary"
-          />
-        </View>
       </SectionCard>
     </Screen>
   );
@@ -146,11 +127,11 @@ function BlockPreview({ theme, block, index }: BlockPreviewProps) {
     return (
       <SectionCard
         theme={theme}
-        title={`Блок ${index + 1}: ${block.title || "Теория"}`}
-        subtitle="Текстовый материал"
+        title={`Блок ${index + 1}: текст`}
+        subtitle={block.title || "Текстовый материал лекции"}
       >
-        {lines.map((line, lineIndex) => (
-          <Text key={`${block.id}-${lineIndex}`} style={styles.textLine}>
+        {lines.slice(0, 5).map((line, lineIndex) => (
+          <Text key={`${line}-${lineIndex}`} style={line.startsWith("-") ? styles.listItem : styles.textLine}>
             {line.startsWith("-") ? `• ${line.replace(/^-+\s*/, "")}` : line}
           </Text>
         ))}
@@ -170,16 +151,16 @@ function BlockPreview({ theme, block, index }: BlockPreviewProps) {
     return (
       <SectionCard
         theme={theme}
-        title={`Блок ${index + 1}: ${block.title || "Визуализация"}`}
-        subtitle="Визуальный модуль"
+        title={`Блок ${index + 1}: визуализация`}
+        subtitle={visualBlock.payload.caption || "Интерактивная визуализация для этой лекции"}
       >
-        <Text style={styles.bodyText}>
-          {visualBlock.payload.caption || "Интерактивная визуализация для этой лекции."}
-        </Text>
         <Text style={styles.bodyText}>Сцена: {sceneName}</Text>
-        <Text style={styles.noteText}>
-          На следующем шаге сюда можно подключить полноценный рендер VM Graphics.
-        </Text>
+        <VisualModuleFallback
+          theme={theme}
+          compact
+          title="Preview визуального модуля"
+          description="Пока здесь безопасный UI-fallback. Позже этот контейнер можно будет заменить на реальный рендер VM Graphics."
+        />
       </SectionCard>
     );
   }
@@ -189,20 +170,18 @@ function BlockPreview({ theme, block, index }: BlockPreviewProps) {
   return (
     <SectionCard
       theme={theme}
-      title={`Блок ${index + 1}: ${block.title || "Проверочный блок"}`}
-      subtitle={`Вопросов: ${quizBlock.payload.questions.length}`}
+      title={`Блок ${index + 1}: проверка`}
+      subtitle="Проверочный блок лекции"
     >
       <Text style={styles.bodyText}>
         Ограничение по времени: {quizBlock.payload.timeLimitSec ?? 0} сек.
       </Text>
 
-      <View style={styles.topSpacing}>
-        {quizBlock.payload.questions.map((question, questionIndex) => (
-          <Text key={question.id} style={styles.listItem}>
-            {questionIndex + 1}. {question.text}
-          </Text>
-        ))}
-      </View>
+      {quizBlock.payload.questions.map((question, questionIndex) => (
+        <Text key={`${question.text}-${questionIndex}`} style={styles.listItem}>
+          {questionIndex + 1}. {question.text}
+        </Text>
+      ))}
     </SectionCard>
   );
 }
