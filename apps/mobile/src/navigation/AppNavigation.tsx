@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -6,7 +6,7 @@ import {
   Text,
   View
 } from "react-native";
-import type { LectureDetails } from "@vm/shared";
+import type { LectureDetails, QuizBlock, QuizQuestion, TextBlock } from "@vm/shared";
 import { createMockSession, evaluateSubmission, type SessionData, type TaskResult, type TaskSubmission } from "../mocks/session";
 import { createTeacherManagedSession, moveTeacherSessionBlock, updateTeacherSessionStatus, type TeacherManagedSession } from "../mocks/teacher";
 import { mockLectures, type LectureItem } from "../mocks/lectures";
@@ -18,7 +18,7 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { SessionScreen } from "../screens/SessionScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
-import { TeacherHomeScreen } from "../screens/TeacherHomeScreen";
+import { TeacherHomeScreen, type DraftLectureInput, type DraftLectureMetaInput, type DraftQuestionInput } from "../screens/TeacherHomeScreen";
 import { TeacherSessionControlScreen } from "../screens/TeacherSessionControlScreen";
 import {
   clearAuthSession,
@@ -87,6 +87,360 @@ function upsertLecture(lectures: LectureItem[], lecture: LectureItem): LectureIt
   return next;
 }
 
+
+function createDraftLectureItem(
+  lectureId: string,
+  input: DraftLectureInput,
+  author: string
+): LectureItem {
+  return {
+    id: lectureId,
+    title: input.title,
+    author,
+    subject: "Draft lecture",
+    semester: "Current term",
+    level: "Draft",
+    tags: ["draft", "teacher"],
+    description: input.description,
+    blocks: ["??????", "???????"],
+    participationRequirements: ["???????? ?????????????"],
+    estimatedDuration: "15 ?????"
+  };
+}
+
+function createDraftLectureDetails(
+  lectureId: string,
+  input: DraftLectureInput
+): LectureDetails {
+  const theoryBlock: TextBlock = {
+    id: `${lectureId}-theory`,
+    type: "text",
+    title: "??????",
+    payload: {
+      markdown: input.theory
+    }
+  };
+
+  const quizBlock: QuizBlock = {
+    id: `${lectureId}-quiz`,
+    type: "quiz",
+    title: "???????",
+    payload: {
+      questions: []
+    }
+  };
+
+  return {
+    id: lectureId,
+    title: input.title,
+    description: input.description,
+    blocks: [theoryBlock, quizBlock]
+  };
+}
+
+function ensureEditableLectureDetails(
+  lecture: LectureItem | null,
+  details?: LectureDetails | null
+): LectureDetails | null {
+  if (details) {
+    return details;
+  }
+
+  if (!lecture) {
+    return null;
+  }
+
+  const theoryBlock: TextBlock = {
+    id: `${lecture.id}-theory`,
+    type: "text",
+    title: "??????",
+    payload: {
+      markdown: lecture.description || ""
+    }
+  };
+
+  const quizBlock: QuizBlock = {
+    id: `${lecture.id}-quiz`,
+    type: "quiz",
+    title: "???????",
+    payload: {
+      questions: []
+    }
+  };
+
+  return {
+    id: lecture.id,
+    title: lecture.title,
+    description: lecture.description,
+    blocks: [theoryBlock, quizBlock]
+  };
+}
+
+function withQuestionAdded(
+  details: LectureDetails,
+  input: DraftQuestionInput
+): LectureDetails {
+  const questionId = `question-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const question: QuizQuestion = {
+    id: questionId,
+    type: "single",
+    text: input.text,
+    options: [
+      { id: "A", text: input.optionA },
+      { id: "B", text: input.optionB },
+      { id: "C", text: input.optionC },
+      { id: "D", text: input.optionD }
+    ],
+    correctAnswerHint: input.explanation
+      ? `?????????? ?????: ${input.correctOptionKey}. ${input.explanation}`
+      : `?????????? ?????: ${input.correctOptionKey}.`
+  };
+
+  let quizFound = false
+
+
+  const nextBlocks = details.blocks.map((block) => {
+    if (block.type !== "quiz") {
+      return block;
+    }
+
+    quizFound = true;
+
+    return {
+      ...block,
+      payload: {
+        ...block.payload,
+        questions: [...block.payload.questions, question]
+      }
+    };
+  });
+
+  if (!quizFound) {
+    nextBlocks.push({
+      id: `${details.id}-quiz`,
+      type: "quiz",
+      title: "???????",
+      payload: {
+        questions: [question]
+      }
+    } as QuizBlock);
+  }
+
+  return {
+    ...details,
+    blocks: nextBlocks
+  };
+}
+
+function withQuestionDeleted(details: LectureDetails, questionId: string): LectureDetails {
+  return {
+    ...details,
+    blocks: details.blocks.map((block) => {
+      if (block.type !== "quiz") {
+        return block;
+      }
+
+      return {
+        ...block,
+        payload: {
+          ...block.payload,
+          questions: block.payload.questions.filter((question) => question.id !== questionId)
+        }
+      };
+    })
+  };
+}
+
+
+const DRAFT_LECTURES_STORAGE_KEY = "vm_mobile_draft_lectures_v1";
+
+type DraftStorageShape = {
+  lectures: LectureItem[];
+  lectureDetailsById: Record<string, LectureDetails>;
+};
+
+function readDraftStorage(): DraftStorageShape | null {
+  try {
+    const storage = (globalThis as {
+      localStorage?: {
+        getItem: (key: string) => string | null;
+      };
+    }).localStorage;
+
+    if (!storage) {
+      return null;
+    }
+
+    const raw = storage.getItem(DRAFT_LECTURES_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw) as DraftStorageShape;
+
+    return {
+      lectures: Array.isArray(parsed.lectures) ? parsed.lectures : [],
+      lectureDetailsById:
+        parsed.lectureDetailsById && typeof parsed.lectureDetailsById === "object"
+          ? parsed.lectureDetailsById
+          : {}
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeDraftStorage(payload: DraftStorageShape) {
+  try {
+    const storage = (globalThis as {
+      localStorage?: {
+        setItem: (key: string, value: string) => void;
+      };
+    }).localStorage;
+
+    if (!storage) {
+      return;
+    }
+
+    storage.setItem(DRAFT_LECTURES_STORAGE_KEY, JSON.stringify(payload));
+  } catch {}
+}
+
+function mergeDraftLectures(base: LectureItem[], drafts: LectureItem[]): LectureItem[] {
+  const next = new Map<string, LectureItem>();
+
+  for (const lecture of base) {
+    next.set(lecture.id, lecture);
+  }
+
+  for (const lecture of drafts) {
+    next.set(lecture.id, lecture);
+  }
+
+  return Array.from(next.values());
+}
+
+function pickDraftLectureDetails(
+  details: Record<string, LectureDetails>
+): Record<string, LectureDetails> {
+  return Object.fromEntries(
+    Object.entries(details).filter(([lectureId]) => lectureId.startsWith("draft-lecture-"))
+  );
+}
+
+
+const WEB_DRAFTS_KEY_V4 = "vm_mobile_web_drafts_v4";
+
+type WebDraftStateV4 = {
+  lectures: LectureItem[];
+  lectureDetailsById: Record<string, LectureDetails>;
+};
+
+function isDraftLectureV4(lectureId: string): boolean {
+  return lectureId.startsWith("draft-lecture-");
+}
+
+function readWebDraftStateV4(): WebDraftStateV4 {
+  try {
+    const storage = (globalThis as {
+      localStorage?: {
+        getItem: (key: string) => string | null;
+        setItem: (key: string, value: string) => void;
+      };
+    }).localStorage;
+
+    if (!storage) {
+      return { lectures: [], lectureDetailsById: {} };
+    }
+
+    const raw = storage.getItem(WEB_DRAFTS_KEY_V4);
+
+    if (!raw) {
+      return { lectures: [], lectureDetailsById: {} };
+    }
+
+    const parsed = JSON.parse(raw) as WebDraftStateV4;
+
+    return {
+      lectures: Array.isArray(parsed.lectures) ? parsed.lectures : [],
+      lectureDetailsById:
+        parsed.lectureDetailsById && typeof parsed.lectureDetailsById === "object"
+          ? parsed.lectureDetailsById
+          : {}
+    };
+  } catch {
+    return { lectures: [], lectureDetailsById: {} };
+  }
+}
+
+function writeWebDraftStateV4(payload: WebDraftStateV4) {
+  try {
+    const storage = (globalThis as {
+      localStorage?: {
+        getItem: (key: string) => string | null;
+        setItem: (key: string, value: string) => void;
+      };
+    }).localStorage;
+
+    if (!storage) {
+      return;
+    }
+
+    storage.setItem(WEB_DRAFTS_KEY_V4, JSON.stringify(payload));
+  } catch {}
+}
+
+function mergeWithDraftsV4(base: LectureItem[], drafts: LectureItem[]): LectureItem[] {
+  const next = new Map<string, LectureItem>();
+
+  for (const lecture of base) {
+    next.set(lecture.id, lecture);
+  }
+
+  for (const lecture of drafts) {
+    next.set(lecture.id, lecture);
+  }
+
+  return Array.from(next.values());
+}
+
+function persistDraftsV4(
+  lectures: LectureItem[],
+  lectureDetailsById: Record<string, LectureDetails>
+) {
+  writeWebDraftStateV4({
+    lectures: lectures.filter((lecture) => isDraftLectureV4(lecture.id)),
+    lectureDetailsById: Object.fromEntries(
+      Object.entries(lectureDetailsById).filter(([lectureId]) => isDraftLectureV4(lectureId))
+    )
+  });
+}
+
+
+function isDraftLecture(lectureId: string): boolean {
+  return lectureId.startsWith("draft-lecture-");
+}
+
+function mergeDraftLecturesIntoCatalog(
+  apiLectures: LectureItem[],
+  currentLectures: LectureItem[]
+): LectureItem[] {
+  const next = new Map<string, LectureItem>();
+
+  for (const lecture of apiLectures) {
+    next.set(lecture.id, lecture);
+  }
+
+  for (const lecture of currentLectures) {
+    if (isDraftLecture(lecture.id)) {
+      next.set(lecture.id, lecture);
+    }
+  }
+
+  return Array.from(next.values());
+}
+
 export function AppNavigation() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -99,6 +453,33 @@ export function AppNavigation() {
   const [lastOpenedLectureId, setLastOpenedLectureId] = useState<string | null>(null);
 
   const [lectureDetailsById, setLectureDetailsById] = useState<Record<string, LectureDetails>>({});
+  const [draftsLoaded, setDraftsLoaded] = useState(false);
+
+  useEffect(() => {
+    const savedDrafts = readDraftStorage();
+
+    if (savedDrafts) {
+      setCatalogLectures((current) => mergeDraftLectures(current, savedDrafts.lectures));
+      setLectureDetailsById((current) => ({
+        ...current,
+        ...savedDrafts.lectureDetailsById
+      }));
+    }
+
+    setDraftsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftsLoaded) {
+      return;
+    }
+
+    writeDraftStorage({
+      lectures: catalogLectures.filter((lecture) => lecture.id.startsWith("draft-lecture-")),
+      lectureDetailsById: pickDraftLectureDetails(lectureDetailsById)
+    });
+  }, [draftsLoaded, catalogLectures, lectureDetailsById]);
+
   const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
   const [currentResult, setCurrentResult] = useState<TaskResult | null>(null);
   const [currentTeacherSession, setCurrentTeacherSession] = useState<TeacherManagedSession | null>(null);
@@ -133,11 +514,20 @@ export function AppNavigation() {
           return;
         }
 
+        const webDraftState = readWebDraftStateV4();
+
         if (cachedLectures && cachedLectures.length > 0) {
-          setCatalogLectures(cachedLectures);
+          setCatalogLectures(mergeWithDraftsV4(cachedLectures, webDraftState.lectures));
           setCatalogMode("offline");
         } else {
-          setCatalogLectures(mockLectures);
+          setCatalogLectures(mergeWithDraftsV4(mockLectures, webDraftState.lectures));
+        }
+
+        if (Object.keys(webDraftState.lectureDetailsById).length > 0) {
+          setLectureDetailsById((current) => ({
+            ...current,
+            ...webDraftState.lectureDetailsById
+          }));
         }
 
         if (cachedLastLectureId) {
@@ -175,9 +565,16 @@ export function AppNavigation() {
               )
             );
 
-            setCatalogLectures(nextLectures);
+            const webDraftState = readWebDraftStateV4();
+            const mergedLectures = mergeWithDraftsV4(nextLectures, webDraftState.lectures);
+
+            setCatalogLectures(mergedLectures);
+            setLectureDetailsById((current) => ({
+              ...current,
+              ...webDraftState.lectureDetailsById
+            }));
             setCatalogMode("online");
-            await writeCatalogSnapshot(nextLectures);
+            await writeCatalogSnapshot(mergedLectures);
           } catch {
             setCatalogMode(cachedLectures?.length ? "offline" : "error");
           }
@@ -205,6 +602,15 @@ export function AppNavigation() {
 
     void writeCatalogSnapshot(catalogLectures);
   }, [catalogLectures, isHydrating]);
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    persistDraftsV4(catalogLectures, lectureDetailsById);
+  }, [catalogLectures, lectureDetailsById, isHydrating]);
+
 
   useEffect(() => {
     if (isHydrating) {
@@ -315,19 +721,90 @@ function resetStudentFlow() {
     setCurrentTeacherSession(null);
   }
 
-  async function handleLogout() {
+  
+
+  function handleUpdateDraftLectureMeta(lectureId: string, input: DraftLectureMetaInput) {
+    setCatalogLectures((current) =>
+      current.map((lecture) =>
+        lecture.id === lectureId
+          ? {
+              ...lecture,
+              subject: input.subject,
+              semester: input.semester,
+              level: input.level
+            }
+          : lecture
+      )
+    );
+  }
+
+  function handleCreateDraftLecture(input: DraftLectureInput): string | null {
+    const lectureId = `draft-lecture-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const nextLecture = createDraftLectureItem(lectureId, input, user.fullName);
+    const nextDetails = createDraftLectureDetails(lectureId, input);
+
+    setCatalogLectures((current) => upsertLecture(current, nextLecture));
+    setLectureDetailsById((current) => ({
+      ...current,
+      [lectureId]: nextDetails
+    }));
+    setSelectedLecture(nextLecture);
+    setLastOpenedLectureId(lectureId);
+    void writeLastLectureId(lectureId);
+
+    return lectureId;
+  }
+
+  function handleAddDraftQuestion(lectureId: string, input: DraftQuestionInput) {
+    const lecture = catalogLectures.find((item) => item.id === lectureId) ?? null;
+
+    setLectureDetailsById((current) => {
+      const editable = ensureEditableLectureDetails(lecture, current[lectureId]);
+      if (!editable) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [lectureId]: withQuestionAdded(editable, input)
+      };
+    });
+  }
+
+  function handleDeleteDraftQuestion(lectureId: string, questionId: string) {
+    const lecture = catalogLectures.find((item) => item.id === lectureId) ?? null;
+
+    setLectureDetailsById((current) => {
+      const editable = ensureEditableLectureDetails(lecture, current[lectureId]);
+      if (!editable) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [lectureId]: withQuestionDeleted(editable, questionId)
+      };
+    });
+  }
+
+async function handleLogout() {
+    setIsAuthenticated(false);
+    setActiveScreen("catalog");
+    setSelectedLecture(null);
+    setCurrentSession(null);
+    setCurrentResult(null);
+    setCurrentTeacherSession(null);
+    setLastOpenedLectureId(null);
+    setLectureDetailsById({});
+    setUser(mockUser);
+
+    try {
+      await clearAuthSession();
+    } catch {}
+
     try {
       await authApi.logout();
-    } catch {
-    }
-
-    await clearAuthSession();
-
-    setIsAuthenticated(false);
-    resetStudentFlow();
-    resetTeacherFlow();
-    setActiveScreen("catalog");
-    setUser(mockUser);
+    } catch {}
   }
 
   async function handleOpenLecture(lecture: LectureItem) {
@@ -640,7 +1117,13 @@ function resetStudentFlow() {
             theme={theme}
             user={user}
             lectures={catalogLectures}
+            lectureDetailsById={lectureDetailsById}
             onOpenManageSession={(lecture) => void handleOpenManageTeacherSession(lecture)}
+            onCreateDraftLecture={handleCreateDraftLecture}
+            onUpdateDraftLectureMeta={handleUpdateDraftLectureMeta}
+            onAddDraftQuestion={handleAddDraftQuestion}
+            onDeleteDraftQuestion={handleDeleteDraftQuestion}
+            onLogout={() => void handleLogout()}
           />
         ) : null}
 
@@ -678,7 +1161,7 @@ function resetStudentFlow() {
             onCycleSessionMode={() =>
               setSessionMode((currentMode) => nextMode(currentMode))
             }
-            onLogout={() => void handleLogout()}
+            onLogout={() => { void handleLogout(); }}
           />
         ) : null}
       </View>
