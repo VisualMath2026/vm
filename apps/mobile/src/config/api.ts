@@ -1,4 +1,28 @@
-﻿const envBaseUrl = process.env.EXPO_PUBLIC_VM_API_BASE_URL?.trim();
+﻿import { Platform } from "react-native";
 
-export const API_BASE_URL = envBaseUrl || "http://127.0.0.1:8787";
+const envBaseUrl = process.env.EXPO_PUBLIC_VM_API_BASE_URL?.trim();
+
+function getDefaultBaseUrl(): string {
+  if (envBaseUrl) {
+    return envBaseUrl;
+  }
+
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    const { hostname, origin } = window.location;
+    const isLocalHost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0";
+
+    if (isLocalHost) {
+      return "http://127.0.0.1:8787";
+    }
+
+    return `${origin}/api`;
+  }
+
+  return "http://127.0.0.1:8787";
+}
+
+export const API_BASE_URL = getDefaultBaseUrl();
 export const WS_BASE_URL = API_BASE_URL.replace(/^http/i, "ws");

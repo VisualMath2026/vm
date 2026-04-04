@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -268,46 +268,43 @@ export function AppNavigation() {
   }
 
   async function handleLogin(
-    login: string,
-    password: string,
-    role: LoginRole
-  ): Promise<string | null> {
-    if (!login.trim() || !password.trim()) {
-      return "Р’РІРµРґРёС‚Рµ Р»РѕРіРёРЅ Рё РїР°СЂРѕР»СЊ.";
-    }
-
-    try {
-      await authApi.login(login.trim(), password.trim());
-
-      const nextUser: UserProfile = {
-        fullName:
-          role === "teacher"
-            ? "\u0422\u0435\u0441\u0442\u043e\u0432\u044b\u0439 \u043f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044c"
-            : "\u0422\u0435\u0441\u0442\u043e\u0432\u044b\u0439 \u0441\u0442\u0443\u0434\u0435\u043d\u0442",
-        login: login.trim(),
-        role,
-        group: mockUser.group
-      };
-
-      await writeAuthMeta({
-        userLogin: nextUser.login,
-        role,
-        fullName: nextUser.fullName,
-        group: nextUser.group
-      });
-
-      setUser(nextUser);
-      setIsAuthenticated(true);
-      setActiveScreen(role === "teacher" ? "teacherHome" : "catalog");
-
-      await refreshCatalogFromApi();
-      return null;
-    } catch (error) {
-      return toUserMessage(error);
-    }
+  login: string,
+  password: string,
+  role: LoginRole
+): Promise<string | null> {
+  if (!login.trim() || !password.trim()) {
+    return "Введите логин и пароль.";
   }
 
-  function resetStudentFlow() {
+  const nextUser: UserProfile = {
+    fullName:
+      role === "teacher"
+        ? "Тестовый преподаватель"
+        : "Тестовый студент",
+    login: login.trim(),
+    role,
+    group: mockUser.group
+  };
+
+  await writeAuthMeta({
+    userLogin: nextUser.login,
+    role,
+    fullName: nextUser.fullName,
+    group: nextUser.group
+  });
+
+  setUser(nextUser);
+  setIsAuthenticated(true);
+  setActiveScreen(role === "teacher" ? "teacherHome" : "catalog");
+
+  try {
+    await refreshCatalogFromApi();
+  } catch {}
+
+  return null;
+}
+
+function resetStudentFlow() {
     setSelectedLecture(null);
     setCurrentSession(null);
     setCurrentResult(null);
@@ -808,3 +805,4 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   }
 });
+
