@@ -131,7 +131,7 @@ export function ProfileScreen({
       >
         <AppButton
           label="Выйти из аккаунта"
-          onPress={onLogout}
+          onPress={() => { onLogout(); }}
           theme={theme}
           variant="secondary"
         />

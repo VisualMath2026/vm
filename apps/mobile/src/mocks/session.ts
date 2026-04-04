@@ -1,6 +1,7 @@
+﻿import type { LectureDetails } from "@vm/shared";
 import type { LectureItem } from "./lectures";
 
-export type QuestionType = "single-choice" | "short-answer";
+export type QuestionType = "single-choice" | "multiple-choice" | "short-answer";
 
 export type QuestionOption = {
   id: string;
@@ -13,6 +14,7 @@ export type Question = {
   prompt: string;
   options?: QuestionOption[];
   correctOptionId?: string;
+  correctOptionIds?: string[];
   correctAnswerText?: string;
   explanation: string;
   timeLimitSec: number;
@@ -35,6 +37,7 @@ export type SessionData = {
 export type TaskAnswer = {
   questionId: string;
   selectedOptionId?: string;
+  selectedOptionIds?: string[];
   shortAnswer?: string;
 };
 
@@ -92,16 +95,16 @@ function lectureQuestions(lectureId: string): Question[] {
       },
       {
         id: "d-3",
-        type: "single-choice",
-        prompt: "Если производная положительна на промежутке, функция на нём...",
+        type: "multiple-choice",
+        prompt: "Какие утверждения о производной верны? Выберите все правильные варианты.",
         options: [
-          { id: "a", label: "убывает" },
-          { id: "b", label: "возрастает" },
-          { id: "c", label: "не определена" },
-          { id: "d", label: "постоянна" }
+          { id: "a", label: "Если производная положительна на промежутке, функция возрастает." },
+          { id: "b", label: "Производная константы равна 1." },
+          { id: "c", label: "Производная x² равна 2x." },
+          { id: "d", label: "Касательная всегда параллельна оси Ox." }
         ],
-        correctOptionId: "b",
-        explanation: "Положительная производная означает возрастание функции.",
+        correctOptionIds: ["a", "c"],
+        explanation: "Верны утверждения про возрастание функции при положительной производной и формулу (x²)' = 2x.",
         timeLimitSec: 240,
         points: 1
       },
@@ -267,7 +270,67 @@ function lectureQuestions(lectureId: string): Question[] {
   ];
 }
 
-export function createMockSession(lecture: LectureItem): SessionData {
+function buildQuestionsFromLectureDetails(
+  lecture: LectureItem,
+  lectureDetails?: LectureDetails | null
+): Question[] {
+  const quizBlock = lectureDetails?.blocks.find((block) => block.type === "quiz");
+
+  if (!quizBlock || quizBlock.type !== "quiz" || quizBlock.payload.questions.length === 0) {
+    return lecture.id.startsWith("draft-") ? [] : lectureQuestions(lecture.id);
+  }
+
+  return quizBlock.payload.questions.map((question: any, index: number) => {
+    const baseQuestion = {
+      id: String(question?.id ?? `draft-question-${index + 1}`),
+      prompt: String(question?.text ?? `Вопрос ${index + 1}`),
+      explanation: String(question?.correctAnswerHint ?? "Добавлено преподавателем."),
+      timeLimitSec: Number(quizBlock.payload.timeLimitSec ?? 180),
+      points: 1
+    };
+
+    if (question?.type === "single") {
+      return {
+        ...baseQuestion,
+        type: "single-choice" as const,
+        options: Array.isArray(question?.options)
+          ? question.options.map((option: any, optionIndex: number) => ({
+              id: String(option?.id ?? String.fromCharCode(97 + optionIndex)),
+              label: String(option?.text ?? option?.label ?? `Вариант ${optionIndex + 1}`)
+            }))
+          : [],
+        correctOptionId: String(question?.correctOptionId ?? "a")
+      };
+    }
+
+    if (question?.type === "multi") {
+      return {
+        ...baseQuestion,
+        type: "multiple-choice" as const,
+        options: Array.isArray(question?.options)
+          ? question.options.map((option: any, optionIndex: number) => ({
+              id: String(option?.id ?? String.fromCharCode(97 + optionIndex)),
+              label: String(option?.text ?? option?.label ?? `Вариант ${optionIndex + 1}`)
+            }))
+          : [],
+        correctOptionIds: Array.isArray(question?.correctOptionIds)
+          ? question.correctOptionIds.map(String)
+          : []
+      };
+    }
+
+    return {
+      ...baseQuestion,
+      type: "short-answer" as const,
+      correctAnswerText: String(question?.correctAnswerText ?? "")
+    };
+  });
+}
+
+export function createMockSession(
+  lecture: LectureItem,
+  lectureDetails?: LectureDetails | null
+): SessionData {
   return {
     sessionId: `session-${lecture.id}`,
     sessionCode: lecture.id.toUpperCase().replace("LECTURE-", "VM-"),
@@ -278,12 +341,16 @@ export function createMockSession(lecture: LectureItem): SessionData {
     currentBlockTitle: "Проверочный блок",
     participantsCount: lecture.id === "lecture-3" ? 18 : 24,
     startedAt: new Date().toISOString(),
-    questions: lectureQuestions(lecture.id)
+    questions: buildQuestionsFromLectureDetails(lecture, lectureDetails)
   };
 }
 
 function normalize(value: string | undefined): string {
   return (value ?? "").trim().toLowerCase();
+}
+
+function normalizeOptionIds(value: string[] | undefined): string[] {
+  return [...(value ?? [])].sort();
 }
 
 export function evaluateSubmission(
@@ -294,12 +361,8 @@ export function evaluateSubmission(
     const submitted = submission.answers.find((item) => item.questionId === question.id);
 
     if (question.type === "single-choice") {
-      const selectedOption = question.options?.find(
-        (option) => option.id === submitted?.selectedOptionId
-      );
-      const correctOption = question.options?.find(
-        (option) => option.id === question.correctOptionId
-      );
+      const selectedOption = question.options?.find((option) => option.id === submitted?.selectedOptionId);
+      const correctOption = question.options?.find((option) => option.id === question.correctOptionId);
       const isCorrect = submitted?.selectedOptionId === question.correctOptionId;
 
       return {
@@ -307,6 +370,34 @@ export function evaluateSubmission(
         prompt: question.prompt,
         submittedAnswerLabel: selectedOption?.label ?? "Ответ не указан",
         correctAnswerLabel: correctOption?.label ?? "Нет данных",
+        explanation: question.explanation,
+        isCorrect
+      };
+    }
+
+    if (question.type === "multiple-choice") {
+      const submittedIds = normalizeOptionIds(submitted?.selectedOptionIds);
+      const correctIds = normalizeOptionIds(question.correctOptionIds);
+
+      const submittedLabels =
+        question.options
+          ?.filter((option) => submittedIds.includes(option.id))
+          .map((option) => option.label) ?? [];
+
+      const correctLabels =
+        question.options
+          ?.filter((option) => correctIds.includes(option.id))
+          .map((option) => option.label) ?? [];
+
+      const isCorrect =
+        submittedIds.length === correctIds.length &&
+        submittedIds.every((id, index) => id === correctIds[index]);
+
+      return {
+        questionId: question.id,
+        prompt: question.prompt,
+        submittedAnswerLabel: submittedLabels.length > 0 ? submittedLabels.join(", ") : "Ответ не указан",
+        correctAnswerLabel: correctLabels.length > 0 ? correctLabels.join(", ") : "Нет данных",
         explanation: question.explanation,
         isCorrect
       };
@@ -325,15 +416,19 @@ export function evaluateSubmission(
   });
 
   const correctCount = answers.filter((item) => item.isCorrect).length;
+  const earnedPoints = session.questions.reduce((sum, question, index) => {
+    return sum + (answers[index]?.isCorrect ? question.points : 0);
+  }, 0);
   const maxPoints = session.questions.reduce((sum, question) => sum + question.points, 0);
 
   return {
     correctCount,
     totalQuestions: session.questions.length,
-    earnedPoints: correctCount,
+    earnedPoints,
     maxPoints,
     answers,
     status: submission.status,
     timeSpentSec: submission.timeSpentSec
   };
 }
+
