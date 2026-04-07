@@ -1,4 +1,4 @@
-﻿export type UserProfile = {
+export type UserProfile = {
   fullName: string;
   login: string;
   role: "student" | "teacher";

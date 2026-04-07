@@ -1,4 +1,4 @@
-﻿import type { LectureDetails } from "@vm/shared";
+import type { LectureDetails } from "@vm/shared";
 import type { LectureItem } from "./lectures";
 
 export type QuestionType = "single-choice" | "multiple-choice" | "short-answer";

@@ -1,4 +1,4 @@
-﻿import { Platform } from "react-native";
+import { Platform } from "react-native";
 
 const envBaseUrl = process.env.EXPO_PUBLIC_VM_API_BASE_URL?.trim();
 

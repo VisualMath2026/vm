@@ -1,4 +1,4 @@
-﻿import { getColors, type ThemeMode } from "./colors";
+import { getColors, type ThemeMode } from "./colors";
 import { spacing } from "./spacing";
 import { typography } from "./typography";
 

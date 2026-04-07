@@ -1,4 +1,4 @@
-﻿export const typography = {
+export const typography = {
   title: 28,
   screenTitle: 24,
   sectionTitle: 18,
