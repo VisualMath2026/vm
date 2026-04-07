@@ -14,6 +14,7 @@ import { SectionCard } from "../components/ui/SectionCard";
 import { StatusPill } from "../components/ui/StatusPill";
 import type { LectureItem } from "../mocks/lectures";
 import type { AppTheme } from "../theme";
+import { fixText, fixTextList } from "../utils/fixText";
 
 type CatalogScreenProps = {
   theme: AppTheme;
@@ -80,7 +81,7 @@ export function CatalogScreen({
           <View style={styles.metaRow}>
             <StatusPill
               theme={theme}
-              label={`Длительность: ${lastOpenedLecture.estimatedDuration}`}
+              label={`Длительность: ${(lastOpenedLecture.id.startsWith("draft-lecture-") ? "15 минут" : lastOpenedLecture.estimatedDuration)}`}
               tone="info"
             />
           </View>
@@ -205,17 +206,17 @@ export function CatalogScreen({
               subtitle={`${lecture.subject} • ${lecture.semester} • ${lecture.level}`}
               theme={theme}
             >
-              <Text style={styles.description}>{lecture.description}</Text>
+              <Text style={styles.description}>{fixText(lecture.description)}</Text>
 
               <View style={styles.metaRow}>
                 <StatusPill
                   theme={theme}
-                  label={lecture.author}
+                  label={lecture.id.startsWith("draft-lecture-") ? "Visual Math Team" : lecture.author}
                   tone="neutral"
                 />
                 <StatusPill
                   theme={theme}
-                  label={lecture.estimatedDuration}
+                  label={fixText((lecture.id.startsWith("draft-lecture-") ? "15 минут" : lecture.estimatedDuration))}
                   tone="info"
                 />
               </View>

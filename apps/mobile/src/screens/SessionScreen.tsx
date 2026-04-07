@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/ui/AppButton";
 import { ErrorState } from "../components/ui/ErrorState";

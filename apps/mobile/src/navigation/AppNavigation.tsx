@@ -96,15 +96,15 @@ function createDraftLectureItem(
   return {
     id: lectureId,
     title: input.title,
-    author,
-    subject: "Draft lecture",
-    semester: "Current term",
-    level: "Draft",
+    author: "Visual Math Team",
+    subject: input.subject,
+    semester: input.semester,
+    level: input.level,
     tags: ["draft", "teacher"],
     description: input.description,
-    blocks: ["??????", "???????"],
-    participationRequirements: ["???????? ?????????????"],
-    estimatedDuration: "15 ?????"
+    blocks: ["Theory", "Questions"],
+    participationRequirements: ["Visual Math Team"],
+    estimatedDuration: "15 минут"
   };
 }
 
@@ -115,7 +115,7 @@ function createDraftLectureDetails(
   const theoryBlock: TextBlock = {
     id: `${lectureId}-theory`,
     type: "text",
-    title: "??????",
+    title: "Theory",
     payload: {
       markdown: input.theory
     }
@@ -124,7 +124,7 @@ function createDraftLectureDetails(
   const quizBlock: QuizBlock = {
     id: `${lectureId}-quiz`,
     type: "quiz",
-    title: "???????",
+    title: "Questions",
     payload: {
       questions: []
     }
@@ -153,7 +153,7 @@ function ensureEditableLectureDetails(
   const theoryBlock: TextBlock = {
     id: `${lecture.id}-theory`,
     type: "text",
-    title: "??????",
+    title: "Theory",
     payload: {
       markdown: lecture.description || ""
     }
@@ -162,7 +162,7 @@ function ensureEditableLectureDetails(
   const quizBlock: QuizBlock = {
     id: `${lecture.id}-quiz`,
     type: "quiz",
-    title: "???????",
+    title: "Questions",
     payload: {
       questions: []
     }
@@ -193,12 +193,11 @@ function withQuestionAdded(
       { id: "D", text: input.optionD }
     ],
     correctAnswerHint: input.explanation
-      ? `?????????? ?????: ${input.correctOptionKey}. ${input.explanation}`
-      : `?????????? ?????: ${input.correctOptionKey}.`
+      ? `Correct answer: ${input.correctOptionKey}. ${input.explanation}`
+      : `Correct answer: ${input.correctOptionKey}.`
   };
 
-  let quizFound = false
-
+  let quizFound = false;
 
   const nextBlocks = details.blocks.map((block) => {
     if (block.type !== "quiz") {
@@ -220,7 +219,7 @@ function withQuestionAdded(
     nextBlocks.push({
       id: `${details.id}-quiz`,
       type: "quiz",
-      title: "???????",
+      title: "Questions",
       payload: {
         questions: [question]
       }
@@ -253,7 +252,7 @@ function withQuestionDeleted(details: LectureDetails, questionId: string): Lectu
 }
 
 
-const DRAFT_LECTURES_STORAGE_KEY = "vm_mobile_draft_lectures_v1";
+const DRAFT_LECTURES_STORAGE_KEY = "vm_mobile_draft_lectures_v900";
 
 type DraftStorageShape = {
   lectures: LectureItem[];
@@ -330,7 +329,7 @@ function pickDraftLectureDetails(
 }
 
 
-const WEB_DRAFTS_KEY_V4 = "vm_mobile_web_drafts_v4";
+const WEB_DRAFTS_KEY_V4 = "vm_mobile_web_drafts_v900";
 
 type WebDraftStateV4 = {
   lectures: LectureItem[];
@@ -641,9 +640,13 @@ export function AppNavigation() {
         )
       );
 
-      setCatalogLectures(nextLectures);
+      const mergedLectures = mergeDraftLecturesIntoCatalog(nextLectures, catalogLectures);
+
+      setCatalogLectures(mergedLectures);
+
       setCatalogMode("online");
-      await writeCatalogSnapshot(nextLectures);
+
+      await writeCatalogSnapshot(mergedLectures);
     } catch {
       setCatalogMode(catalogLectures.length > 0 ? "offline" : "error");
     }
@@ -679,14 +682,14 @@ export function AppNavigation() {
   role: LoginRole
 ): Promise<string | null> {
   if (!login.trim() || !password.trim()) {
-    return "Введите логин и пароль.";
+    return "Р’РІРµРґРёС‚Рµ Р»РѕРіРёРЅ Рё РїР°СЂРѕР»СЊ.";
   }
 
   const nextUser: UserProfile = {
     fullName:
       role === "teacher"
-        ? "Тестовый преподаватель"
-        : "Тестовый студент",
+        ? "РўРµСЃС‚РѕРІС‹Р№ РїСЂРµРїРѕРґР°РІР°С‚РµР»СЊ"
+        : "РўРµСЃС‚РѕРІС‹Р№ СЃС‚СѓРґРµРЅС‚",
     login: login.trim(),
     role,
     group: mockUser.group
@@ -795,7 +798,7 @@ async function handleLogout() {
     setCurrentResult(null);
     setCurrentTeacherSession(null);
     setLastOpenedLectureId(null);
-    setLectureDetailsById({});
+    setLectureDetailsById((current) => pickDraftLectureDetails(current));
     setUser(mockUser);
 
     try {
@@ -1288,4 +1291,6 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   }
 });
+
+
 

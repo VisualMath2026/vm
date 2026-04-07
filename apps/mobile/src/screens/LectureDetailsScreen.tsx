@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { LectureDetails, LectureBlock, QuizBlock, TextBlock, VisualBlock } from "@vm/shared";
 import { AppButton } from "../components/ui/AppButton";
@@ -9,6 +9,7 @@ import { StatusPill } from "../components/ui/StatusPill";
 import { VisualModuleFallback } from "../components/visual/VisualModuleFallback";
 import type { LectureItem } from "../mocks/lectures";
 import type { AppTheme } from "../theme";
+import { fixText, fixTextList } from "../utils/fixText";
 
 type LectureDetailsScreenProps = {
   theme: AppTheme;
@@ -37,7 +38,7 @@ export function LectureDetailsScreen({
         rightSlot={
           <View style={styles.metaRow}>
             <StatusPill theme={theme} label={lecture.level} tone="info" />
-            <StatusPill theme={theme} label={lecture.estimatedDuration} tone="neutral" />
+            <StatusPill theme={theme} label={fixText((lecture.id.startsWith("draft-lecture-") ? "15 минут" : lecture.estimatedDuration))} tone="neutral" />
           </View>
         }
       />
@@ -47,13 +48,13 @@ export function LectureDetailsScreen({
         title="О лекции"
         subtitle="Краткая информация перед входом в занятие"
       >
-        <Text style={styles.bodyText}>{lecture.description}</Text>
-        <Text style={styles.bodyText}>Автор: {lecture.author}</Text>
+        <Text style={styles.bodyText}>{fixText(lecture.description)}</Text>
+        <Text style={styles.bodyText}>Автор: {lecture.id.startsWith("draft-lecture-") ? "Visual Math Team" : lecture.author}</Text>
         <Text style={styles.bodyText}>Семестр: {lecture.semester}</Text>
         <Text style={styles.bodyText}>Теги: {lecture.tags.join(", ")}</Text>
 
         <View style={styles.topSpacing}>
-          {lecture.participationRequirements.map((item, index) => (
+          {fixTextList((lecture.id.startsWith("draft-lecture-") ? ["Visual Math Team"] : lecture.participationRequirements)).map((item, index) => (
             <Text key={`${item}-${index}`} style={styles.listItem}>
               • {item}
             </Text>
@@ -84,7 +85,7 @@ export function LectureDetailsScreen({
           </>
         ) : (
           <>
-            {lecture.blocks.map((block, index) => (
+            {fixTextList((lecture.id.startsWith("draft-lecture-") ? ["Theory", "Questions"] : lecture.blocks)).map((block, index) => (
               <Text key={`${block}-${index}`} style={styles.listItem}>
                 {index + 1}. {block}
               </Text>

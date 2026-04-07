@@ -1,4 +1,4 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";

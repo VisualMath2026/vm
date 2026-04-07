@@ -10,6 +10,7 @@ import { StatusPill } from "../components/ui/StatusPill";
 import type { UserProfile } from "../mocks/user";
 import type { AppTheme, ThemeMode } from "../theme";
 
+import { fixText } from "../utils/fixText";
 type DemoDataMode = "online" | "offline" | "loading" | "error";
 
 type ProfileScreenProps = {
@@ -50,7 +51,7 @@ export function ProfileScreen({
       />
 
       <SectionCard
-        title={user.fullName}
+        title={user.login === "teacher" ? "\u0421\u0435\u0440\u0433\u0435\u0439 \u043f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044c" : user.login === "student" ? "\u0421\u0442\u0443\u0434\u0435\u043d\u0442" : "\u041f\u0440\u043e\u0444\u0438\u043b\u044c"}
         subtitle="Учебный профиль"
         theme={theme}
       >

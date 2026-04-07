@@ -1,4 +1,4 @@
-﻿import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "expo-secure-store";
 import type { TokenPair, TokenStorage } from "@vm/integration";
 
 export type StoredAuthMeta = {
@@ -13,7 +13,7 @@ type StoredAuthRecord = {
   meta: StoredAuthMeta;
 };
 
-const AUTH_SESSION_KEY = "vm.auth.session";
+const AUTH_SESSION_KEY = "vm.auth.session.v200";
 
 function isValidRecord(value: unknown): value is StoredAuthRecord {
   if (!value || typeof value !== "object") {

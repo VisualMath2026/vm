@@ -9,6 +9,7 @@ import { SectionCard } from "../components/ui/SectionCard";
 import type { LectureItem } from "../mocks/lectures";
 import type { UserProfile } from "../mocks/user";
 import type { AppTheme } from "../theme";
+import { fixText } from "../utils/fixText";
 
 export type DraftLectureInput = {
   title: string;
@@ -260,7 +261,7 @@ export function TeacherHomeScreen({
       <Text style={styles.title}>Кабинет преподавателя</Text>
       <Text style={styles.subtitle}>Создание лекций, теории, подписей и вопросов.</Text>
 
-      <SectionCard title={user.fullName} subtitle="Преподаватель" theme={theme}>
+      <SectionCard title={user.login === "teacher" ? "\u0421\u0435\u0440\u0433\u0435\u0439 \u043f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044c" : "\u041f\u0440\u0435\u043f\u043e\u0434\u0430\u0432\u0430\u0442\u0435\u043b\u044c"} subtitle="Преподаватель" theme={theme}>
         <Text style={styles.metaText}>Логин: {user.login}</Text>
         <Text style={styles.metaText}>Роль: преподаватель</Text>
         <Text style={styles.metaText}>Группа: {user.group}</Text>
