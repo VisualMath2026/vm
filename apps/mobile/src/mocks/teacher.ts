@@ -1,3 +1,4 @@
+import type { QuizQuestion } from "@vm/shared";
 import type { LectureItem } from "./lectures";
 
 export type TeacherParticipantStatus =
@@ -22,10 +23,12 @@ export type TeacherManagedSession = {
   blocks: string[];
   currentBlockIndex: number;
   participants: TeacherParticipant[];
+  questionPreview: QuizQuestion[];
 };
 
 export function createTeacherManagedSession(
-  lecture: LectureItem
+  lecture: LectureItem,
+  questionPreview: QuizQuestion[] = []
 ): TeacherManagedSession {
   return {
     sessionId: `teacher-session-${lecture.id}`,
@@ -35,6 +38,7 @@ export function createTeacherManagedSession(
     status: "draft",
     blocks: lecture.blocks,
     currentBlockIndex: 0,
+    questionPreview,
     participants: [
       { id: "s1", name: "Иван Петров", status: "online", score: null },
       { id: "s2", name: "Мария Смирнова", status: "in-progress", score: null },

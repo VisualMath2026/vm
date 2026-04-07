@@ -270,6 +270,28 @@ function lectureQuestions(lectureId: string): Question[] {
   ];
 }
 
+function resolveCorrectOptionId(question: any): string {
+  const direct = String(question?.correctOptionId ?? "")
+    .trim()
+    .replace(/[.\s]+$/g, "")
+    .toUpperCase();
+
+  if (direct) {
+    return direct;
+  }
+
+  const hint = String(question?.correctAnswerHint ?? "");
+  const token = hint.includes(":")
+    ? hint.split(":").pop()?.trim().split(/\s+/)[0]?.replace(/[.\s]+$/g, "").toUpperCase() ?? ""
+    : "";
+
+  if (token) {
+    return token;
+  }
+
+  return "A";
+}
+
 function buildQuestionsFromLectureDetails(
   lecture: LectureItem,
   lectureDetails?: LectureDetails | null
@@ -281,10 +303,17 @@ function buildQuestionsFromLectureDetails(
   }
 
   return quizBlock.payload.questions.map((question: any, index: number) => {
+    const options = Array.isArray(question?.options)
+      ? question.options.map((option: any, optionIndex: number) => ({
+          id: String.fromCharCode(65 + optionIndex),
+          label: String(option?.text ?? option?.label ?? `??????? ${optionIndex + 1}`)
+        }))
+      : [];
+
     const baseQuestion = {
       id: String(question?.id ?? `draft-question-${index + 1}`),
-      prompt: String(question?.text ?? `Вопрос ${index + 1}`),
-      explanation: String(question?.correctAnswerHint ?? "Добавлено преподавателем."),
+      prompt: String(question?.text ?? `?????? ${index + 1}`),
+      explanation: String(question?.correctAnswerHint ?? "????????? ??????????????."),
       timeLimitSec: Number(quizBlock.payload.timeLimitSec ?? 180),
       points: 1
     };
@@ -293,13 +322,8 @@ function buildQuestionsFromLectureDetails(
       return {
         ...baseQuestion,
         type: "single-choice" as const,
-        options: Array.isArray(question?.options)
-          ? question.options.map((option: any, optionIndex: number) => ({
-              id: String(option?.id ?? String.fromCharCode(97 + optionIndex)),
-              label: String(option?.text ?? option?.label ?? `Вариант ${optionIndex + 1}`)
-            }))
-          : [],
-        correctOptionId: String(question?.correctOptionId ?? "a")
+        options,
+        correctOptionId: resolveCorrectOptionId(question)
       };
     }
 
@@ -307,15 +331,12 @@ function buildQuestionsFromLectureDetails(
       return {
         ...baseQuestion,
         type: "multiple-choice" as const,
-        options: Array.isArray(question?.options)
-          ? question.options.map((option: any, optionIndex: number) => ({
-              id: String(option?.id ?? String.fromCharCode(97 + optionIndex)),
-              label: String(option?.text ?? option?.label ?? `Вариант ${optionIndex + 1}`)
-            }))
-          : [],
-        correctOptionIds: Array.isArray(question?.correctOptionIds)
-          ? question.correctOptionIds.map(String)
-          : []
+        options,
+        correctOptionIds: normalizeOptionIds(
+          Array.isArray(question?.correctOptionIds)
+            ? question.correctOptionIds.map((value: unknown) => String(value).trim().toUpperCase())
+            : []
+        )
       };
     }
 
@@ -326,6 +347,7 @@ function buildQuestionsFromLectureDetails(
     };
   });
 }
+
 
 export function createMockSession(
   lecture: LectureItem,
@@ -346,13 +368,38 @@ export function createMockSession(
 }
 
 function normalize(value: string | undefined): string {
-  return (value ?? "").trim().toLowerCase();
+  return (value ?? "").trim().replace(/[.\s]+$/g, "").toLowerCase();
 }
 
 function normalizeOptionIds(value: string[] | undefined): string[] {
-  return [...(value ?? [])].sort();
+  return [...(value ?? [])].map((item) => String(item).trim().toUpperCase()).sort();
 }
 
+
+function resolveOptionById(
+  options: QuestionOption[] | undefined,
+  optionId: string | undefined
+): QuestionOption | undefined {
+  const normalizedId = normalize(optionId);
+
+  if (!options || options.length === 0 || !normalizedId) {
+    return undefined;
+  }
+
+  const direct = options.find((option) => normalize(option.id) === normalizedId);
+  if (direct) {
+    return direct;
+  }
+
+  const upper = normalizedId.toUpperCase();
+  const charCode = upper.charCodeAt(0);
+
+  if (charCode >= 65 && charCode <= 90) {
+    return options[charCode - 65];
+  }
+
+  return undefined;
+}
 export function evaluateSubmission(
   session: SessionData,
   submission: TaskSubmission
@@ -361,15 +408,24 @@ export function evaluateSubmission(
     const submitted = submission.answers.find((item) => item.questionId === question.id);
 
     if (question.type === "single-choice") {
-      const selectedOption = question.options?.find((option) => option.id === submitted?.selectedOptionId);
-      const correctOption = question.options?.find((option) => option.id === question.correctOptionId);
-      const isCorrect = submitted?.selectedOptionId === question.correctOptionId;
+      const resolvedCorrectOptionId = resolveCorrectOptionId(question);
+
+      const selectedOption = question.options?.find(
+        (option) => normalize(option.id) === normalize(submitted?.selectedOptionId)
+      );
+
+      const correctOption = question.options?.find(
+        (option) => normalize(option.id) === normalize(resolvedCorrectOptionId)
+      );
+
+      const isCorrect =
+        normalize(submitted?.selectedOptionId) === normalize(resolvedCorrectOptionId);
 
       return {
         questionId: question.id,
         prompt: question.prompt,
-        submittedAnswerLabel: selectedOption?.label ?? "Ответ не указан",
-        correctAnswerLabel: correctOption?.label ?? "Нет данных",
+        submittedAnswerLabel: selectedOption?.label ?? "????? ?? ??????",
+        correctAnswerLabel: correctOption?.label ?? resolvedCorrectOptionId ?? "??? ??????",
         explanation: question.explanation,
         isCorrect
       };

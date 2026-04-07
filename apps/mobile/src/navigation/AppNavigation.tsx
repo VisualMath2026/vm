@@ -771,23 +771,74 @@ function resetStudentFlow() {
     return lectureId;
   }
 
-  function handleAddDraftQuestion(lectureId: string, input: DraftQuestionInput) {
+      function handleAddDraftQuestion(lectureId: string, input: DraftQuestionInput) {
     const lecture = catalogLectures.find((item) => item.id === lectureId) ?? null;
 
     setLectureDetailsById((current) => {
       const editable = ensureEditableLectureDetails(lecture, current[lectureId]);
+
       if (!editable) {
         return current;
       }
 
+      const questionId = `question-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const correctOptionId = String(input.correctOptionKey).trim().toUpperCase();
+
+      const nextQuestion: QuizQuestion = {
+        id: questionId,
+        type: "single",
+        text: input.text,
+        options: [
+          { id: "A", text: input.optionA },
+          { id: "B", text: input.optionB },
+          { id: "C", text: input.optionC },
+          { id: "D", text: input.optionD }
+        ],
+        correctAnswerHint: input.explanation
+          ? `Correct answer: ${String(input.correctOptionKey).trim().toUpperCase()}. ${input.explanation}`
+          : `Correct answer: ${String(input.correctOptionKey).trim().toUpperCase()}.`
+      };
+
+      let quizFound = false;
+
+      const nextBlocks = editable.blocks.map((block) => {
+        if (block.type !== "quiz") {
+          return block;
+        }
+
+        quizFound = true;
+
+        return {
+          ...block,
+          payload: {
+            ...block.payload,
+            questions: [...block.payload.questions, nextQuestion]
+          }
+        };
+      });
+
+      if (!quizFound) {
+        nextBlocks.push({
+          id: `${lectureId}-quiz`,
+          type: "quiz",
+          title: "Questions",
+          payload: {
+            questions: [nextQuestion]
+          }
+        } as QuizBlock);
+      }
+
       return {
         ...current,
-        [lectureId]: withQuestionAdded(editable, input)
+        [lectureId]: {
+          ...editable,
+          blocks: nextBlocks
+        }
       };
     });
   }
 
-  function handleDeleteDraftQuestion(lectureId: string, questionId: string) {
+function handleDeleteDraftQuestion(lectureId: string, questionId: string) {
     const lecture = catalogLectures.find((item) => item.id === lectureId) ?? null;
 
     setLectureDetailsById((current) => {
@@ -843,44 +894,52 @@ async function handleLogout() {
   }
 
   async function handleOpenSession() {
-    if (!selectedLecture) {
-      return;
-    }
+      if (!selectedLecture) {
+        return;
+      }
 
-    setSessionMode("loading");
+      setSessionMode("loading");
 
-    try {
       const details =
         lectureDetailsById[selectedLecture.id] ?? (await ensureLectureDetails(selectedLecture));
 
-      if (!details) {
-        throw new Error("Lecture details are unavailable");
+      if (selectedLecture.id.startsWith("draft-lecture-")) {
+        setCurrentSession(createMockSession(selectedLecture, details));
+        setCurrentResult(null);
+        setSessionMode("online");
+        setActiveScreen("session");
+        return;
       }
 
-      const created = await sessionApi.createSession(selectedLecture.id);
-      const sessionState = await sessionApi.getSession(created.sessionId);
+      if (!details) {
+        setCurrentSession(createMockSession(selectedLecture));
+        setCurrentResult(null);
+        setSessionMode("offline");
+        setActiveScreen("session");
+        return;
+      }
 
-      const mappedLecture = mapLectureDetailsToLectureItem(details, selectedLecture);
-      const mappedSession = mapSessionToSessionData({
-        lecture: mappedLecture,
-        details,
-        sessionState
-      });
+      try {
+        const sessionState = await sessionApi.getSession(selectedLecture.id);
+        const mappedSession = mapSessionToSessionData({
+          lecture: selectedLecture,
+          details,
+          sessionState
+        });
 
-      setSelectedLecture(mappedLecture);
-      setCurrentSession(mappedSession);
-      setCurrentResult(null);
-      setSessionMode("online");
-      setActiveScreen("session");
-    } catch {
-      setCurrentSession(createMockSession(selectedLecture));
-      setCurrentResult(null);
-      setSessionMode("error");
-      setActiveScreen("session");
+        setCurrentSession(mappedSession);
+        setCurrentResult(null);
+        setSessionMode("online");
+        setActiveScreen("session");
+      } catch {
+        setCurrentSession(createMockSession(selectedLecture, details));
+        setCurrentResult(null);
+        setSessionMode("offline");
+        setActiveScreen("session");
+      }
     }
-  }
 
-  function handleBackToLecture() {
+    function handleBackToLecture() {
     setCurrentResult(null);
     setActiveScreen("details");
   }
@@ -953,30 +1012,18 @@ async function handleLogout() {
   }
 
   async function handleOpenManageTeacherSession(lecture: LectureItem) {
-    try {
-      const details =
-        lectureDetailsById[lecture.id] ?? (await ensureLectureDetails(lecture));
+    const details = lectureDetailsById[lecture.id];
 
-      if (!details) {
-        throw new Error("Lecture details are unavailable");
-      }
+    const quizQuestions =
+      details?.blocks
+        .filter((block) => block.type === "quiz")
+        .flatMap((block) =>
+          block.type === "quiz" ? block.payload.questions : []
+        ) ?? [];
 
-      const created = await sessionApi.createSession(lecture.id);
-      const sessionState = await sessionApi.getSession(created.sessionId);
-
-      const mappedLecture = mapLectureDetailsToLectureItem(details, lecture);
-      const teacherSession = mapSessionToTeacherManagedSession({
-        lecture: mappedLecture,
-        sessionState
-      });
-
-      setCurrentTeacherSession(teacherSession);
-      setActiveScreen("teacherSession");
-    } catch {
-      const fallbackSession = createTeacherManagedSession(lecture);
-      setCurrentTeacherSession(fallbackSession);
-      setActiveScreen("teacherSession");
-    }
+    setSelectedLecture(lecture);
+    setCurrentTeacherSession(createTeacherManagedSession(lecture, quizQuestions));
+    setActiveScreen("teacherSession");
   }
 
   function handleBackToTeacherHome() {
