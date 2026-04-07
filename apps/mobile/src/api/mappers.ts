@@ -227,6 +227,7 @@ export function mapSessionToTeacherManagedSession(params: {
     status: "draft",
     blocks: lecture.blocks,
     currentBlockIndex: 0,
+    questionPreview: [],
     participants: sessionState.participants.map((participant) => ({
       id: participant.userId,
       name: participant.fullName,
