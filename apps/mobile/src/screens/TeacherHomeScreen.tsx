@@ -46,6 +46,7 @@ type TeacherHomeScreenProps = {
   onUpdateDraftLectureMeta: (lectureId: string, input: DraftLectureMetaInput) => void;
   onAddDraftQuestion: (lectureId: string, input: DraftQuestionInput) => void;
   onDeleteDraftQuestion: (lectureId: string, questionId: string) => void;
+  onDeleteLecture: (lectureId: string) => void;
   onLogout: () => void;
 };
 
@@ -59,6 +60,7 @@ export function TeacherHomeScreen({
   onUpdateDraftLectureMeta,
   onAddDraftQuestion,
   onDeleteDraftQuestion,
+  onDeleteLecture,
   onLogout
 }: TeacherHomeScreenProps) {
   const styles = createStyles(theme);
@@ -368,6 +370,14 @@ export function TeacherHomeScreen({
                   fullWidth={false}
                   style={styles.inlineButton}
                 />
+                  <AppButton
+                    label="Удалить лекцию"
+                    onPress={() => onDeleteLecture(lecture.id)}
+                    theme={theme}
+                    variant="secondary"
+                    fullWidth={false}
+                    style={styles.inlineButton}
+                  />
               </View>
 
               {isExpanded ? (

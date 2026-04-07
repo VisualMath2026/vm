@@ -741,6 +741,19 @@ function resetStudentFlow() {
     );
   }
 
+  function handleDeleteLecture(lectureId: string) {
+    setCatalogLectures((current) => current.filter((lecture) => lecture.id !== lectureId));
+
+    setLectureDetailsById((current) => {
+      const next = { ...current };
+      delete next[lectureId];
+      return next;
+    });
+
+    setSelectedLecture((current) => (current?.id === lectureId ? null : current));
+    setLastOpenedLectureId((current) => (current === lectureId ? null : current));
+  }
+
   function handleCreateDraftLecture(input: DraftLectureInput): string | null {
     const lectureId = `draft-lecture-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const nextLecture = createDraftLectureItem(lectureId, input, user.fullName);
@@ -1126,6 +1139,7 @@ async function handleLogout() {
             onUpdateDraftLectureMeta={handleUpdateDraftLectureMeta}
             onAddDraftQuestion={handleAddDraftQuestion}
             onDeleteDraftQuestion={handleDeleteDraftQuestion}
+            onDeleteLecture={handleDeleteLecture}
             onLogout={() => void handleLogout()}
           />
         ) : null}
