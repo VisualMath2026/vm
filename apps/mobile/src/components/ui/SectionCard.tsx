@@ -1,6 +1,7 @@
 import React from "react";
 
 import { StyleSheet, Text, View } from "react-native";
+import { fixText } from "../../utils/fixText";
 
 import type { AppTheme } from "../../theme";
 
@@ -21,8 +22,8 @@ export function SectionCard({
 
   return (
     <View style={styles.card}>
-      {title ? <Text style={styles.title}>{title}</Text> : null}
-      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+      {title ? <Text style={styles.title}>{fixText(title)}</Text> : null}
+      {subtitle ? <Text style={styles.subtitle}>{subtitle ? fixText(subtitle) : subtitle}</Text> : null}
       {children}
     </View>
   );

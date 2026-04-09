@@ -7,6 +7,7 @@ import {
   type TextInputProps,
   View
 } from "react-native";
+import { fixText } from "../../utils/fixText";
 
 import type { AppTheme } from "../../theme";
 
@@ -26,7 +27,7 @@ export function AppInput({
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{fixText(label)}</Text>
       <TextInput
         placeholderTextColor={theme.colors.textSecondary}
         style={styles.input}

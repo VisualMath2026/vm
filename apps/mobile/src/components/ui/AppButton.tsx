@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   type ViewStyle
 } from "react-native";
+import { fixText } from "../../utils/fixText";
 
 import type { AppTheme } from "../../theme";
 
@@ -39,7 +40,7 @@ export function AppButton({
       onPress={onPress}
       style={[styles.button, style]}
     >
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{fixText(label)}</Text>
     </TouchableOpacity>
   );
 }

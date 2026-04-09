@@ -1,6 +1,7 @@
 import React from "react";
 
 import { StyleSheet, Text, View } from "react-native";
+import { fixText } from "../../utils/fixText";
 
 import type { AppTheme } from "../../theme";
 
@@ -21,7 +22,7 @@ export function StatusPill({
 
   return (
     <View style={styles.pill}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={styles.label}>{fixText(label)}</Text>
     </View>
   );
 }

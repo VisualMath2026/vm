@@ -15,6 +15,7 @@ export type DraftLectureInput = {
   title: string;
   description: string;
   theory: string;
+  videoUrl: string;
   subject: string;
   semester: string;
   level: string;
@@ -24,6 +25,7 @@ export type DraftLectureMetaInput = {
   subject: string;
   semester: string;
   level: string;
+  videoUrl: string;
 };
 
 export type DraftQuestionInput = {
@@ -68,6 +70,7 @@ export function TeacherHomeScreen({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [theory, setTheory] = useState("");
+  const [videoUrl, setVideoUrl] = useState("");
   const [subject, setSubject] = useState("Математический анализ");
   const [semester, setSemester] = useState("1 семестр");
   const [level, setLevel] = useState("Базовый");
@@ -169,7 +172,8 @@ export function TeacherHomeScreen({
       theory: nextTheory,
       subject: nextSubject,
       semester: nextSemester,
-      level: nextLevel
+      level: nextLevel,
+      videoUrl
     });
 
     if (!createdLectureId) {
@@ -181,6 +185,7 @@ export function TeacherHomeScreen({
     setTitle("");
     setDescription("");
     setTheory("");
+    setVideoUrl("");
     setSubject("Математический анализ");
     setSemester("1 семестр");
     setLevel("Базовый");
@@ -221,7 +226,8 @@ export function TeacherHomeScreen({
     onUpdateDraftLectureMeta(expandedLecture.id, {
       subject: nextSubject,
       semester: nextSemester,
-      level: nextLevel
+      level: nextLevel,
+      videoUrl
     });
 
     setMetaSuccess("Подписи обновлены.");
@@ -577,6 +583,9 @@ function getQuestions(details?: LectureDetails): QuizQuestion[] {
 
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
+    webLightInput: {
+      color: "#FFFFFF",
+    },
     title: {
       fontSize: theme.typography.screenTitle,
       fontWeight: "800",

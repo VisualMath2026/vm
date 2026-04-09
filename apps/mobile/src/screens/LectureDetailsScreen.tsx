@@ -1,5 +1,11 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import {
+  StyleSheet,
+  Text,
+  View,
+  Linking,
+  Pressable
+} from "react-native";
 import type { LectureDetails, LectureBlock, QuizBlock, TextBlock, VisualBlock } from "@vm/shared";
 import { AppButton } from "../components/ui/AppButton";
 import { Screen } from "../components/ui/Screen";
@@ -27,6 +33,7 @@ export function LectureDetailsScreen({
   onOpenSession
 }: LectureDetailsScreenProps) {
   const styles = createStyles(theme);
+  const videoUrl = String((lecture as { videoUrl?: string }).videoUrl ?? "").trim();
   const blocks = lectureDetails?.blocks ?? [];
 
   return (
@@ -42,6 +49,40 @@ export function LectureDetailsScreen({
           </View>
         }
       />
+
+      {videoUrl ? (
+        <SectionCard
+          title="\u0412\u0438\u0434\u0435\u043e\u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b"
+          subtitle="\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0441\u0441\u044b\u043b\u043a\u0443 \u0438 \u0441\u043c\u043e\u0442\u0440\u0438\u0442\u0435 \u0432\u0438\u0434\u0435\u043e"
+          theme={theme}
+        >
+          <Pressable
+            onPress={() => void Linking.openURL(videoUrl)}
+            style={{
+              paddingVertical: theme.spacing.xs
+            }}
+          >
+            <Text
+              style={{
+                color: theme.colors.primary,
+                fontSize: theme.typography.body,
+                fontWeight: "700"
+              }}
+            >
+              \u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0432\u0438\u0434\u0435\u043e
+            </Text>
+            <Text
+              style={{
+                color: theme.colors.textSecondary,
+                fontSize: theme.typography.caption,
+                marginTop: theme.spacing.xs
+              }}
+            >
+              {videoUrl}
+            </Text>
+          </Pressable>
+        </SectionCard>
+      ) : null}
 
       <SectionCard
         theme={theme}

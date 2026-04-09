@@ -1,6 +1,7 @@
 import React from "react";
 
 import { StyleSheet, Text, View } from "react-native";
+import { fixText } from "../../utils/fixText";
 
 import type { AppTheme } from "../../theme";
 
@@ -22,8 +23,8 @@ export function ScreenHeader({
   return (
     <View style={styles.wrapper}>
       <View style={styles.textBlock}>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        <Text style={styles.title}>{fixText(title)}</Text>
+        {subtitle ? <Text style={styles.subtitle}>{subtitle ? fixText(subtitle) : subtitle}</Text> : null}
       </View>
 
       {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}

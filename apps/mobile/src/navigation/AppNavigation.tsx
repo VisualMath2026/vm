@@ -13,10 +13,11 @@ import { mockLectures, type LectureItem } from "../mocks/lectures";
 import { mockUser, type UserProfile } from "../mocks/user";
 import { CatalogScreen } from "../screens/CatalogScreen";
 import { LectureDetailsScreen } from "../screens/LectureDetailsScreen";
-import { LoginScreen } from "../screens/LoginScreen";
+import { LoginScreen, type GoogleLoginPayload } from "../screens/LoginScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { SessionScreen } from "../screens/SessionScreen";
 import { SolverScreen } from "../screens/SolverScreen";
+import { VideoLessonsScreen, type VideoLessonItem } from "../screens/VideoLessonsScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
 import { TeacherHomeScreen, type DraftLectureInput, type DraftLectureMetaInput, type DraftQuestionInput } from "../screens/TeacherHomeScreen";
@@ -37,6 +38,7 @@ import {
   writeThemeMode
 } from "../storage/mobileCache";
 import { createAppTheme, type AppTheme, type ThemeMode } from "../theme";
+import { fixText } from "../utils/fixText";
 import { authApi, catalogApi, quizApi, sessionApi, toUserMessage } from "../api/mobileApi";
 import {
   mapLectureDetailsToLectureItem,
@@ -55,7 +57,8 @@ type ScreenKey =
   | "result"
   | "teacherHome"
   | "teacherSession"
-    | "solver"
+  | "solver"
+  | "videoLessons"
   | "profile";
 
 type LoginRole = "student" | "teacher";
@@ -93,21 +96,29 @@ function upsertLecture(lectures: LectureItem[], lecture: LectureItem): LectureIt
 function createDraftLectureItem(
   lectureId: string,
   input: DraftLectureInput,
-  author: string
+  authorName: string
 ): LectureItem {
-  return {
+  const lecture: LectureItem = {
     id: lectureId,
-    title: input.title,
-    author: "Visual Math Team",
-    subject: input.subject,
-    semester: input.semester,
-    level: input.level,
+    title: input.title.trim() || "\u041d\u043e\u0432\u0430\u044f \u043b\u0435\u043a\u0446\u0438\u044f",
+    author: authorName || "Visual Math Team",
+    subject: input.subject.trim() || "\u041c\u0430\u0442\u0435\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u0430\u043d\u0430\u043b\u0438\u0437",
+    semester: input.semester.trim() || "1 \u0441\u0435\u043c\u0435\u0441\u0442\u0440",
+    level: input.level.trim() || "\u0411\u0430\u0437\u043e\u0432\u044b\u0439",
     tags: ["draft", "teacher"],
-    description: input.description,
-    blocks: ["Theory", "Questions"],
-    participationRequirements: ["Visual Math Team"],
-    estimatedDuration: "15 минут"
+    description: input.description.trim() || "\u041a\u0440\u0430\u0442\u043a\u043e\u0435 \u043e\u043f\u0438\u0441\u0430\u043d\u0438\u0435.",
+    blocks: ["\u0422\u0435\u043e\u0440\u0438\u044f", "\u041f\u0440\u043e\u0432\u0435\u0440\u043e\u0447\u043d\u044b\u0439 \u0431\u043b\u043e\u043a"],
+    participationRequirements: ["\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u043b\u0435\u043a\u0446\u0438\u044e \u0438 \u043d\u0430\u0447\u043d\u0438\u0442\u0435 \u0441\u0435\u0441\u0441\u0438\u044e"],
+    estimatedDuration: "15 \u043c\u0438\u043d\u0443\u0442"
   };
+
+  const trimmedVideoUrl = input.videoUrl.trim();
+
+  if (trimmedVideoUrl) {
+    (lecture as LectureItem & { videoUrl?: string }).videoUrl = trimmedVideoUrl;
+  }
+
+  return lecture;
 }
 
 function createDraftLectureDetails(
@@ -514,6 +525,38 @@ function appendTeacherSessionResult(lectureId: string, correctCount: number) {
   writeTeacherSessionStats(current);
 }
 
+
+const VIDEO_LESSONS_STORAGE_KEY = "vm_mobile_video_lessons_v1";
+
+function readVideoLessons(): VideoLessonItem[] {
+  try {
+    const storage = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    if (!storage) {
+      return [];
+    }
+
+    const raw = storage.getItem(VIDEO_LESSONS_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as VideoLessonItem[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeVideoLessons(value: VideoLessonItem[]) {
+  try {
+    const storage = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    if (!storage) {
+      return;
+    }
+
+    storage.setItem(VIDEO_LESSONS_STORAGE_KEY, JSON.stringify(value));
+  } catch {}
+}
 export function AppNavigation() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -527,6 +570,7 @@ export function AppNavigation() {
 
   const [lectureDetailsById, setLectureDetailsById] = useState<Record<string, LectureDetails>>({});
   const [draftsLoaded, setDraftsLoaded] = useState(false);
+  const [videoLessons, setVideoLessons] = useState<VideoLessonItem[]>(readVideoLessons());
 
   useEffect(() => {
     const savedDrafts = readDraftStorage();
@@ -553,7 +597,10 @@ export function AppNavigation() {
     });
   }, [draftsLoaded, catalogLectures, lectureDetailsById]);
 
-  const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
+  useEffect(() => {
+    writeVideoLessons(videoLessons);
+  }, [videoLessons]);
+const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
   const [currentResult, setCurrentResult] = useState<TaskResult | null>(null);
   const [currentTeacherSession, setCurrentTeacherSession] = useState<TeacherManagedSession | null>(null);
 
@@ -760,10 +807,7 @@ export function AppNavigation() {
   }
 
   const nextUser: UserProfile = {
-    fullName:
-      role === "teacher"
-        ? "РўРµСЃС‚РѕРІС‹Р№ РїСЂРµРїРѕРґР°РІР°С‚РµР»СЊ"
-        : "РўРµСЃС‚РѕРІС‹Р№ СЃС‚СѓРґРµРЅС‚",
+    fullName: role === "teacher" ? "РўРµСЃС‚РѕРІС‹Р№ РїСЂРµРїРѕРґР°РІР°С‚РµР»СЊ" : "РўРµСЃС‚РѕРІС‹Р№ СЃС‚СѓРґРµРЅС‚",
     login: login.trim(),
     role,
     group: mockUser.group
@@ -787,6 +831,31 @@ export function AppNavigation() {
   return null;
 }
 
+async function handleGoogleLogin(payload: GoogleLoginPayload): Promise<string | null> {
+  const nextUser: UserProfile = {
+    fullName: payload.name.trim() || payload.email.trim(),
+    login: payload.email.trim(),
+    role: "student",
+    group: mockUser.group
+  };
+
+  await writeAuthMeta({
+    userLogin: nextUser.login,
+    role: "student",
+    fullName: nextUser.fullName,
+    group: nextUser.group
+  });
+
+  setUser(nextUser);
+  setIsAuthenticated(true);
+  setActiveScreen("catalog");
+
+  try {
+    await refreshCatalogFromApi();
+  } catch {}
+
+  return null;
+}
 function resetStudentFlow() {
     setSelectedLecture(null);
     setCurrentSession(null);
@@ -801,19 +870,31 @@ function resetStudentFlow() {
   
 
   function handleUpdateDraftLectureMeta(lectureId: string, input: DraftLectureMetaInput) {
-    setCatalogLectures((current) =>
-      current.map((lecture) =>
-        lecture.id === lectureId
-          ? {
-              ...lecture,
-              subject: input.subject,
-              semester: input.semester,
-              level: input.level
-            }
-          : lecture
-      )
-    );
-  }
+      setCatalogLectures((current) =>
+        current.map((lecture) => {
+          if (lecture.id !== lectureId) {
+            return lecture;
+          }
+
+          const nextLecture = {
+            ...lecture,
+            subject: input.subject,
+            semester: input.semester,
+            level: input.level
+          } as LectureItem & { videoUrl?: string };
+
+          const trimmedVideoUrl = input.videoUrl.trim();
+
+          if (trimmedVideoUrl) {
+            nextLecture.videoUrl = trimmedVideoUrl;
+          } else {
+            delete nextLecture.videoUrl;
+          }
+
+          return nextLecture;
+        })
+      );
+    }
 
   function handleDeleteLecture(lectureId: string) {
     setCatalogLectures((current) => current.filter((lecture) => lecture.id !== lectureId));
@@ -929,6 +1010,29 @@ function handleDeleteDraftQuestion(lectureId: string, questionId: string) {
         [lectureId]: withQuestionDeleted(editable, questionId)
       };
     });
+  }
+
+  function handleCreateVideoLesson(input: { title: string; url: string }) {
+    const nextTitle = input.title.trim();
+    const nextUrl = input.url.trim();
+
+    if (!nextTitle || !nextUrl) {
+      return;
+    }
+
+    const nextLesson: VideoLessonItem = {
+      id: `video-lesson-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: nextTitle,
+      url: nextUrl,
+      authorName: fixText(user.fullName || "Visual Math Team"),
+      createdAt: new Date().toISOString()
+    };
+
+    setVideoLessons((current: VideoLessonItem[]) => [nextLesson, ...current]);
+  }
+
+  function handleDeleteVideoLesson(lessonId: string) {
+    setVideoLessons((current: VideoLessonItem[]) => current.filter((lesson: VideoLessonItem) => lesson.id !== lessonId));
   }
 
 async function handleLogout() {
@@ -1150,7 +1254,7 @@ async function handleLogout() {
   }
 
   function handleBottomTabChange(
-      screen: "catalog" | "teacher" | "solver" | "profile"
+      screen: "catalog" | "solver" | "videoLessons" | "profile"
     ) {
       if (screen === "profile") {
         resetTeacherFlow();
@@ -1165,8 +1269,9 @@ async function handleLogout() {
         return;
       }
 
-      if (screen === "teacher") {
-        resetTeacherFlow();
+      resetTeacherFlow();
+
+      if (isTeacher) {
         setActiveScreen("teacherHome");
         return;
       }
@@ -1183,7 +1288,7 @@ async function handleLogout() {
   }
 
   if (!isAuthenticated) {
-    return <LoginScreen theme={theme} onLogin={handleLogin} />;
+    return <LoginScreen theme={theme} onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} />;
   }
 
   const lastOpenedLecture =
@@ -1289,6 +1394,15 @@ async function handleLogout() {
             />
           ) : null}
 
+        {activeScreen === "videoLessons" ? (
+          <VideoLessonsScreen
+            theme={theme}
+            isTeacher={isTeacher}
+            lessons={videoLessons}
+            onCreateLesson={handleCreateVideoLesson}
+            onDeleteLesson={handleDeleteVideoLesson}
+          />
+        ) : null}
           {activeScreen === "profile" ? (
           <ProfileScreen
             theme={theme}
@@ -1328,29 +1442,56 @@ async function handleLogout() {
           backgroundColor: theme.colors.surface
         }}
       >
-        {(isTeacher
-          ? [
-              { key: "catalog", label: "\u041A\u0430\u0442\u0430\u043B\u043E\u0433" },
-              { key: "teacher", label: "\u041F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044C" },
-              { key: "solver", label: "\u0423\u0440\u0430\u0432\u043D\u0435\u043D\u0438\u044F" },
-              { key: "profile", label: "\u041F\u0440\u043E\u0444\u0438\u043B\u044C" }
-            ]
-          : [
-              { key: "catalog", label: "\u041A\u0430\u0442\u0430\u043B\u043E\u0433" },
-              { key: "solver", label: "\u0423\u0440\u0430\u0432\u043D\u0435\u043D\u0438\u044F" },
-              { key: "profile", label: "\u041F\u0440\u043E\u0444\u0438\u043B\u044C" }
-            ]
-        ).map((item) => {
-          const isActive = activeScreen === item.key;
+        {[
+          { key: "catalog", label: "\u041a\u0430\u0442\u0430\u043b\u043e\u0433" },
+          { key: "solver", label: "\u0423\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f" },
+          { key: "videoLessons", label: "\u0412\u0438\u0434\u0435\u043e\u0443\u0440\u043e\u043a\u0438" },
+          { key: "profile", label: "\u041f\u0440\u043e\u0444\u0438\u043b\u044c" }
+        ].map((item) => {
+          const isActive =
+            item.key === "catalog"
+              ? activeScreen === "catalog" ||
+                activeScreen === "details" ||
+                activeScreen === "session" ||
+                activeScreen === "task" ||
+                activeScreen === "result" ||
+                activeScreen === "teacherHome" ||
+                activeScreen === "teacherSession"
+              : activeScreen === item.key;
 
           return (
             <Pressable
               key={item.key}
-              onPress={() =>
-                handleBottomTabChange(
-                  item.key as "catalog" | "teacher" | "solver" | "profile"
-                )
-              }
+              onPress={() => {
+                if (item.key === "videoLessons") {
+                  resetStudentFlow();
+                  resetTeacherFlow();
+                  setActiveScreen("videoLessons");
+                  return;
+                }
+
+                if (item.key === "solver") {
+                  resetStudentFlow();
+                  resetTeacherFlow();
+                  setActiveScreen("solver");
+                  return;
+                }
+
+                if (item.key === "profile") {
+                  resetTeacherFlow();
+                  setActiveScreen("profile");
+                  return;
+                }
+
+                resetTeacherFlow();
+
+                if (isTeacher) {
+                  setActiveScreen("teacherHome");
+                  return;
+                }
+
+                handleBackToCatalog();
+              }}
               style={{
                 flex: 1,
                 alignItems: "center",
