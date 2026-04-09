@@ -170,6 +170,17 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
     return "Пример: 2x - 4 > 0";
   }, [mode]);
 
+  function resetFields() {
+    setA("");
+    setB("");
+    setC("");
+    setD("");
+    setE("");
+    setF("");
+    setResultTitle("Результат появится после нажатия на кнопку.");
+    setSteps([]);
+  }
+
   function saveHistoryItem(expression: string, result: string, itemMode: SolverMode) {
     const nextItem: SolverHistoryItem = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -180,7 +191,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
     };
 
     setHistory((current) => {
-      const next = [nextItem, ...current].slice(0, 8);
+      const next = [nextItem, ...current].slice(0, 10);
       writeSolverHistory(next);
       return next;
     });
@@ -192,6 +203,8 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
   }
 
   function applyHistoryItem(item: SolverHistoryItem) {
+    resetFields();
+
     if (item.mode === "linear" || item.mode === "quadratic" || item.mode === "inequality") {
       const numbers = item.expression.match(/-?\d+(?:[.,]\d+)?/g) ?? [];
       setMode(item.mode);
@@ -231,15 +244,35 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
     setSteps([]);
   }
 
-  function resetFields() {
-    setA("");
-    setB("");
-    setC("");
-    setD("");
-    setE("");
-    setF("");
-    setResultTitle("Результат появится после нажатия на кнопку.");
-    setSteps([]);
+  function fillExample() {
+    resetFields();
+
+    if (mode === "linear") {
+      setA("2");
+      setB("6");
+      return;
+    }
+
+    if (mode === "quadratic") {
+      setA("1");
+      setB("-5");
+      setC("6");
+      return;
+    }
+
+    if (mode === "system") {
+      setA("2");
+      setB("1");
+      setC("5");
+      setD("1");
+      setE("-1");
+      setF("1");
+      return;
+    }
+
+    setA("2");
+    setB("-4");
+    setInequalityOperator(">");
   }
 
   function solveLinear() {
@@ -500,7 +533,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
       <SectionCard title="Как пользоваться" subtitle="Короткая инструкция" theme={theme}>
         <Text style={styles.stepText}>1. Выберите тип задачи.</Text>
         <Text style={styles.stepText}>2. Введите коэффициенты.</Text>
-        <Text style={styles.stepText}>3. Нажмите «Решить».</Text>
+        <Text style={styles.stepText}>3. Нажмите «Решить» или «Подставить пример».</Text>
         <Text style={styles.stepText}>4. Посмотрите ответ и шаги решения.</Text>
       </SectionCard>
 
@@ -557,6 +590,9 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
       <SectionCard title={modeTitle} subtitle="Формула и пример" theme={theme}>
         <Text style={styles.resultTitle}>{modeFormula}</Text>
         <Text style={styles.stepText}>{modeExample}</Text>
+        <View style={styles.buttonGroup}>
+          <AppButton label="Подставить пример" onPress={fillExample} theme={theme} variant="secondary" />
+        </View>
       </SectionCard>
 
       {mode === "inequality" ? (
@@ -607,6 +643,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
             style={styles.input}
             placeholder="Введите a"
             placeholderTextColor={theme.colors.textSecondary}
+            keyboardType="numeric"
           />
         </View>
 
@@ -618,6 +655,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
             style={styles.input}
             placeholder="Введите b"
             placeholderTextColor={theme.colors.textSecondary}
+            keyboardType="numeric"
           />
         </View>
 
@@ -629,6 +667,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
             style={styles.input}
             placeholder="Введите c"
             placeholderTextColor={theme.colors.textSecondary}
+            keyboardType="numeric"
           />
         </View>
 
@@ -642,6 +681,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
                 style={styles.input}
                 placeholder="Введите d"
                 placeholderTextColor={theme.colors.textSecondary}
+                keyboardType="numeric"
               />
             </View>
 
@@ -653,6 +693,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
                 style={styles.input}
                 placeholder="Введите e"
                 placeholderTextColor={theme.colors.textSecondary}
+                keyboardType="numeric"
               />
             </View>
 
@@ -664,6 +705,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
                 style={styles.input}
                 placeholder="Введите f"
                 placeholderTextColor={theme.colors.textSecondary}
+                keyboardType="numeric"
               />
             </View>
           </>
@@ -687,7 +729,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
         ))}
       </SectionCard>
 
-      <SectionCard title="История решений" subtitle="Последние 8 вычислений" theme={theme}>
+      <SectionCard title="История решений" subtitle="Последние 10 вычислений" theme={theme}>
         {history.length === 0 ? (
           <Text style={styles.stepText}>История пока пуста.</Text>
         ) : (
