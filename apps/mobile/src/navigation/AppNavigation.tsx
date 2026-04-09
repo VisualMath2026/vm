@@ -8,7 +8,7 @@ import {
 } from "react-native";
 import type { LectureDetails, QuizBlock, QuizQuestion, TextBlock } from "@vm/shared";
 import { createMockSession, evaluateSubmission, type SessionData, type TaskResult, type TaskSubmission } from "../mocks/session";
-import { createTeacherManagedSession, moveTeacherSessionBlock, updateTeacherSessionStatus, type TeacherManagedSession } from "../mocks/teacher";
+import { clearTeacherParticipants, createTeacherManagedSession, moveTeacherSessionBlock, updateTeacherSessionStatus, type TeacherManagedSession } from "../mocks/teacher";
 import { mockLectures, type LectureItem } from "../mocks/lectures";
 import { mockUser, type UserProfile } from "../mocks/user";
 import { CatalogScreen } from "../screens/CatalogScreen";
@@ -440,6 +440,78 @@ function mergeDraftLecturesIntoCatalog(
   return Array.from(next.values());
 }
 
+
+const TEACHER_STATS_KEY = "vm.teacher.session.stats.v1";
+
+type TeacherSessionStatsRecord = Record<
+  string,
+  {
+    completed: number;
+    totalScore: number;
+    lastCorrectCount: number;
+    updatedAt: string;
+  }
+>;
+
+function readTeacherSessionStats(): TeacherSessionStatsRecord {
+  try {
+    const storage = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    if (!storage) {
+      return {};
+    }
+
+    const raw = storage.getItem(TEACHER_STATS_KEY);
+    if (!raw) {
+      return {};
+    }
+
+    return JSON.parse(raw) as TeacherSessionStatsRecord;
+  } catch {
+    return {};
+  }
+}
+
+function writeTeacherSessionStats(value: TeacherSessionStatsRecord) {
+  try {
+    const storage = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    if (!storage) {
+      return;
+    }
+
+    storage.setItem(TEACHER_STATS_KEY, JSON.stringify(value));
+  } catch {}
+}
+
+function resetTeacherSessionStats(lectureId: string) {
+  const current = readTeacherSessionStats();
+  current[lectureId] = {
+    completed: 0,
+    totalScore: 0,
+    lastCorrectCount: 0,
+    updatedAt: new Date().toISOString()
+  };
+  writeTeacherSessionStats(current);
+}
+
+function appendTeacherSessionResult(lectureId: string, correctCount: number) {
+  const current = readTeacherSessionStats();
+  const previous = current[lectureId] ?? {
+    completed: 0,
+    totalScore: 0,
+    lastCorrectCount: 0,
+    updatedAt: new Date().toISOString()
+  };
+
+  current[lectureId] = {
+    completed: previous.completed + 1,
+    totalScore: previous.totalScore + correctCount,
+    lastCorrectCount: correctCount,
+    updatedAt: new Date().toISOString()
+  };
+
+  writeTeacherSessionStats(current);
+}
+
 export function AppNavigation() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -799,6 +871,9 @@ function resetStudentFlow() {
           : `Correct answer: ${String(input.correctOptionKey).trim().toUpperCase()}.`
       };
 
+      (nextQuestion as QuizQuestion & { correctOptionId?: string }).correctOptionId =
+        String(input.correctOptionKey).trim().toUpperCase();
+
       let quizFound = false;
 
       const nextBlocks = editable.blocks.map((block) => {
@@ -953,61 +1028,51 @@ async function handleLogout() {
   }
 
   async function handleSubmitTask(submission: TaskSubmission) {
-    if (!currentSession || !selectedLecture) {
-      return;
-    }
+      if (!currentSession) {
+        return;
+      }
 
-    const details =
-      lectureDetailsById[selectedLecture.id] ?? (await ensureLectureDetails(selectedLecture));
+      const result = evaluateSubmission(currentSession, submission);
 
-    if (!details) {
-      const fallbackResult = evaluateSubmission(currentSession, submission);
-      setCurrentResult(fallbackResult);
-      setActiveScreen("result");
-      return;
-    }
-
-    try {
-      const quizBlockId =
-        details.blocks.find((block) => block.type === "quiz")?.id ??
-        details.blocks[0]?.id ??
-        "";
-
-      const apiAnswers = currentSession.questions.map((question) => {
-        const answer =
-          submission.answers.find((item) => item.questionId === question.id) ??
-          { questionId: question.id };
-
-        return {
-          questionId: question.id,
-          payload: mapTaskAnswerToApiPayload(question, answer)
-        };
-      });
-
-      const response = await quizApi.submit({
-        sessionId: currentSession.sessionId,
-        blockId: quizBlockId,
-        answers: apiAnswers
-      });
-
-      const result = mapQuizResponseToTaskResult({
-        session: currentSession,
-        submission,
-        response
-      });
+      appendTeacherSessionResult(currentSession.lectureId, result.correctCount);
 
       setCurrentResult(result);
-      setSessionMode("online");
-    } catch {
-      const fallbackResult = evaluateSubmission(currentSession, submission);
-      setCurrentResult(fallbackResult);
-      setSessionMode("error");
+      setActiveScreen("result");
+
+      if (currentTeacherSession && currentTeacherSession.lectureId === currentSession.lectureId) {
+        setCurrentTeacherSession((current) => {
+          if (!current) {
+            return current;
+          }
+
+          const participantIndex = current.participants.findIndex(
+            (participant) =>
+              participant.status === "online" || participant.status === "in-progress"
+          );
+
+          if (participantIndex === -1) {
+            return current;
+          }
+
+          const nextParticipants = current.participants.map((participant, index) =>
+            index === participantIndex
+              ? {
+                  ...participant,
+                  status: "completed" as const,
+                  score: result.correctCount
+                }
+              : participant
+          );
+
+          return {
+            ...current,
+            participants: nextParticipants
+          };
+        });
+      }
     }
 
-    setActiveScreen("result");
-  }
-
-  function handleBackToSession() {
+    function handleBackToSession() {
     setActiveScreen("session");
   }
 
@@ -1032,12 +1097,13 @@ async function handleLogout() {
   }
 
   function handleTeacherStartSession() {
-    if (!currentTeacherSession) {
-      return;
-    }
+      if (!currentTeacherSession) {
+        return;
+      }
 
-    setCurrentTeacherSession(updateTeacherSessionStatus(currentTeacherSession, "active"));
-  }
+      resetTeacherSessionStats(currentTeacherSession.lectureId);
+      setCurrentTeacherSession(updateTeacherSessionStatus(currentTeacherSession, "active"));
+    }
 
   function handleTeacherStopSession() {
     if (!currentTeacherSession) {

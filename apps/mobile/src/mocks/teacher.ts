@@ -1,5 +1,7 @@
 import type { QuizQuestion } from "@vm/shared";
+
 import type { LectureItem } from "./lectures";
+import type { TaskResult } from "./session";
 
 export type TeacherParticipantStatus =
   | "online"
@@ -12,6 +14,9 @@ export type TeacherParticipant = {
   name: string;
   status: TeacherParticipantStatus;
   score: number | null;
+  correctCount: number | null;
+  totalQuestions: number | null;
+  timeSpentSec: number | null;
 };
 
 export type TeacherManagedSession = {
@@ -26,6 +31,78 @@ export type TeacherManagedSession = {
   questionPreview: QuizQuestion[];
 };
 
+const teacherParticipantsByLectureId = new Map<string, TeacherParticipant[]>();
+
+function cloneParticipants(participants: TeacherParticipant[]): TeacherParticipant[] {
+  return participants.map((participant) => ({ ...participant }));
+}
+
+function toParticipantId(name: string): string {
+  const normalized = name.trim().toLowerCase().replace(/\s+/g, "-");
+  return normalized || "student-demo";
+}
+
+export function getTeacherParticipants(lectureId: string): TeacherParticipant[] {
+  return cloneParticipants(teacherParticipantsByLectureId.get(lectureId) ?? []);
+}
+
+export function clearTeacherParticipants(lectureId?: string) {
+  if (lectureId) {
+    teacherParticipantsByLectureId.delete(lectureId);
+    return;
+  }
+
+  teacherParticipantsByLectureId.clear();
+}
+export function markTeacherParticipantInProgress(
+  lectureId: string,
+  participantName = "Студент demo"
+) {
+  const participantId = toParticipantId(participantName);
+  const current = teacherParticipantsByLectureId.get(lectureId) ?? [];
+  const existing = current.find((participant) => participant.id === participantId);
+
+  if (existing?.status === "completed") {
+    return;
+  }
+
+  const nextParticipant: TeacherParticipant = {
+    id: participantId,
+    name: participantName,
+    status: "in-progress",
+    score: existing?.score ?? null,
+    correctCount: existing?.correctCount ?? null,
+    totalQuestions: existing?.totalQuestions ?? null,
+    timeSpentSec: existing?.timeSpentSec ?? null
+  };
+
+  const next = current.filter((participant) => participant.id !== participantId);
+  next.push(nextParticipant);
+  teacherParticipantsByLectureId.set(lectureId, next);
+}
+
+export function recordTeacherParticipantResult(
+  lectureId: string,
+  result: TaskResult,
+  participantName = "Студент demo"
+) {
+  const nextParticipant: TeacherParticipant = {
+    id: toParticipantId(participantName),
+    name: participantName,
+    status: "completed",
+    score: result.earnedPoints,
+    correctCount: result.correctCount,
+    totalQuestions: result.totalQuestions,
+    timeSpentSec: result.timeSpentSec
+  };
+
+  const current = teacherParticipantsByLectureId.get(lectureId) ?? [];
+  const next = current.filter((participant) => participant.id !== nextParticipant.id);
+
+  next.push(nextParticipant);
+  teacherParticipantsByLectureId.set(lectureId, next);
+}
+
 export function createTeacherManagedSession(
   lecture: LectureItem,
   questionPreview: QuizQuestion[] = []
@@ -39,18 +116,11 @@ export function createTeacherManagedSession(
     blocks: lecture.blocks,
     currentBlockIndex: 0,
     questionPreview,
-    participants: [
-      { id: "s1", name: "Иван Петров", status: "online", score: null },
-      { id: "s2", name: "Мария Смирнова", status: "in-progress", score: null },
-      { id: "s3", name: "Олег Кузнецов", status: "completed", score: 1 },
-      { id: "s4", name: "Анна Волкова", status: "offline", score: null }
-    ]
+    participants: getTeacherParticipants(lecture.id)
   };
 }
 
-export function getTeacherCurrentBlock(
-  session: TeacherManagedSession
-): string {
+export function getTeacherCurrentBlock(session: TeacherManagedSession): string {
   return session.blocks[session.currentBlockIndex] ?? "Блок не найден";
 }
 
@@ -76,16 +146,5 @@ export function updateTeacherSessionStatus(
   return {
     ...session,
     status
-  };
-}
-
-export function countTeacherParticipantStatuses(
-  session: TeacherManagedSession
-) {
-  return {
-    online: session.participants.filter((item) => item.status === "online").length,
-    inProgress: session.participants.filter((item) => item.status === "in-progress").length,
-    completed: session.participants.filter((item) => item.status === "completed").length,
-    offline: session.participants.filter((item) => item.status === "offline").length
   };
 }

@@ -232,7 +232,10 @@ export function mapSessionToTeacherManagedSession(params: {
       id: participant.userId,
       name: participant.fullName,
       status: mapParticipantStatus(participant.status),
-      score: null
+      score: null,
+      correctCount: null,
+      totalQuestions: null,
+      timeSpentSec: null
     }))
   };
 }
