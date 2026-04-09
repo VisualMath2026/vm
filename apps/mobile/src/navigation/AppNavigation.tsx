@@ -16,6 +16,7 @@ import { LectureDetailsScreen } from "../screens/LectureDetailsScreen";
 import { LoginScreen } from "../screens/LoginScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { SessionScreen } from "../screens/SessionScreen";
+import { SolverScreen } from "../screens/SolverScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
 import { TeacherHomeScreen, type DraftLectureInput, type DraftLectureMetaInput, type DraftQuestionInput } from "../screens/TeacherHomeScreen";
@@ -54,6 +55,7 @@ type ScreenKey =
   | "result"
   | "teacherHome"
   | "teacherSession"
+    | "solver"
   | "profile";
 
 type LoginRole = "student" | "teacher";
@@ -950,18 +952,19 @@ async function handleLogout() {
   }
 
   async function handleOpenLecture(lecture: LectureItem) {
-    setSelectedLecture(lecture);
-    setLastOpenedLectureId(lecture.id);
-    void writeLastLectureId(lecture.id);
-    setCurrentSession(null);
-    setCurrentResult(null);
-    setActiveScreen("details");
 
-    const details = await ensureLectureDetails(lecture);
-    if (!details) {
-      setCatalogMode("offline");
+      setSelectedLecture(lecture);
+      setLastOpenedLectureId(lecture.id);
+      void writeLastLectureId(lecture.id);
+      setCurrentSession(null);
+      setCurrentResult(null);
+      setActiveScreen("details");
+
+      const details = await ensureLectureDetails(lecture);
+      if (!details) {
+        setCatalogMode("offline");
+      }
     }
-  }
 
   function handleBackToCatalog() {
     resetStudentFlow();
@@ -1146,20 +1149,30 @@ async function handleLogout() {
     }
   }
 
-  function handleBottomTabChange(screen: "catalog" | "teacher" | "profile") {
-    if (screen === "profile") {
-      setActiveScreen("profile");
-      return;
-    }
+  function handleBottomTabChange(
+      screen: "catalog" | "teacher" | "solver" | "profile"
+    ) {
+      if (screen === "profile") {
+        resetTeacherFlow();
+        setActiveScreen("profile");
+        return;
+      }
 
-    if (screen === "teacher") {
-      resetTeacherFlow();
-      setActiveScreen("teacherHome");
-      return;
-    }
+      if (screen === "solver") {
+        resetStudentFlow();
+        resetTeacherFlow();
+        setActiveScreen("solver");
+        return;
+      }
 
-    handleBackToCatalog();
-  }
+      if (screen === "teacher") {
+        resetTeacherFlow();
+        setActiveScreen("teacherHome");
+        return;
+      }
+
+      handleBackToCatalog();
+    }
 
   if (isHydrating) {
     return (
@@ -1269,7 +1282,14 @@ async function handleLogout() {
           />
         ) : null}
 
-        {activeScreen === "profile" ? (
+        {activeScreen === "solver" ? (
+            <SolverScreen
+              theme={theme}
+              onBack={handleBackToCatalog}
+            />
+          ) : null}
+
+          {activeScreen === "profile" ? (
           <ProfileScreen
             theme={theme}
             user={user}
@@ -1296,12 +1316,65 @@ async function handleLogout() {
         ) : null}
       </View>
 
-      <BottomTabs
-        theme={theme}
-        isTeacher={isTeacher}
-        activeScreen={activeBottomTab}
-        onChange={handleBottomTabChange}
-      />
+      <View
+        style={{
+          flexDirection: "row",
+          gap: theme.spacing.sm,
+          paddingHorizontal: theme.spacing.md,
+          paddingTop: theme.spacing.sm,
+          paddingBottom: theme.spacing.md,
+          borderTopWidth: 1,
+          borderTopColor: theme.colors.border,
+          backgroundColor: theme.colors.surface
+        }}
+      >
+        {(isTeacher
+          ? [
+              { key: "catalog", label: "\u041A\u0430\u0442\u0430\u043B\u043E\u0433" },
+              { key: "teacher", label: "\u041F\u0440\u0435\u043F\u043E\u0434\u0430\u0432\u0430\u0442\u0435\u043B\u044C" },
+              { key: "solver", label: "\u0423\u0440\u0430\u0432\u043D\u0435\u043D\u0438\u044F" },
+              { key: "profile", label: "\u041F\u0440\u043E\u0444\u0438\u043B\u044C" }
+            ]
+          : [
+              { key: "catalog", label: "\u041A\u0430\u0442\u0430\u043B\u043E\u0433" },
+              { key: "solver", label: "\u0423\u0440\u0430\u0432\u043D\u0435\u043D\u0438\u044F" },
+              { key: "profile", label: "\u041F\u0440\u043E\u0444\u0438\u043B\u044C" }
+            ]
+        ).map((item) => {
+          const isActive = activeScreen === item.key;
+
+          return (
+            <Pressable
+              key={item.key}
+              onPress={() =>
+                handleBottomTabChange(
+                  item.key as "catalog" | "teacher" | "solver" | "profile"
+                )
+              }
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: theme.spacing.sm,
+                borderRadius: theme.radius.md,
+                backgroundColor: isActive
+                  ? theme.colors.surfaceMuted
+                  : theme.colors.surface
+              }}
+            >
+              <Text
+                style={{
+                  color: isActive ? theme.colors.primary : theme.colors.textSecondary,
+                  fontSize: theme.typography.body,
+                  fontWeight: "700"
+                }}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
