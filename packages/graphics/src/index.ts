@@ -1,3 +1,4 @@
+export * from "./core/renderable";
 export * from "./core/camera2d";
 export * from "./core/scene2d";
 export * from "./renderer2d/primitives";
