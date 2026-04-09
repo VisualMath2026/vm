@@ -5,7 +5,8 @@ import { Screen } from "../components/ui/Screen";
 import { SectionCard } from "../components/ui/SectionCard";
 import type { AppTheme } from "../theme";
 
-type SolverMode = "linear" | "quadratic" | "system";
+type SolverMode = "linear" | "quadratic" | "system" | "inequality";
+type InequalityOperator = ">" | ">=" | "<" | "<=";
 
 type SolverScreenProps = {
   theme: AppTheme;
@@ -25,10 +26,43 @@ function formatNumber(value: number): string {
   return String(Number(value.toFixed(4)));
 }
 
+function invertOperator(operator: InequalityOperator): InequalityOperator {
+  if (operator === ">") {
+    return "<";
+  }
+
+  if (operator === ">=") {
+    return "<=";
+  }
+
+  if (operator === "<") {
+    return ">";
+  }
+
+  return ">=";
+}
+
+function checkConstantInequality(value: number, operator: InequalityOperator): boolean {
+  if (operator === ">") {
+    return value > 0;
+  }
+
+  if (operator === ">=") {
+    return value >= 0;
+  }
+
+  if (operator === "<") {
+    return value < 0;
+  }
+
+  return value <= 0;
+}
+
 export function SolverScreen({ theme, onBack }: SolverScreenProps) {
   const styles = createStyles(theme);
 
   const [mode, setMode] = useState<SolverMode>("linear");
+  const [inequalityOperator, setInequalityOperator] = useState<InequalityOperator>(">");
 
   const [a, setA] = useState("");
   const [b, setB] = useState("");
@@ -49,7 +83,11 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
       return "Квадратное уравнение";
     }
 
-    return "Система 2x2";
+    if (mode === "system") {
+      return "Система 2x2";
+    }
+
+    return "Линейное неравенство";
   }, [mode]);
 
   const modeFormula = useMemo(() => {
@@ -61,8 +99,12 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
       return "ax² + bx + c = 0";
     }
 
-    return "ax + by = c,  dx + ey = f";
-  }, [mode]);
+    if (mode === "system") {
+      return "ax + by = c,  dx + ey = f";
+    }
+
+    return `ax + b ${inequalityOperator} 0`;
+  }, [mode, inequalityOperator]);
 
   const modeExample = useMemo(() => {
     if (mode === "linear") {
@@ -73,7 +115,11 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
       return "Пример: x² - 5x + 6 = 0";
     }
 
-    return "Пример: 2x + y = 5,  x - y = 1";
+    if (mode === "system") {
+      return "Пример: 2x + y = 5,  x - y = 1";
+    }
+
+    return "Пример: 2x - 4 > 0";
   }, [mode]);
 
   function resetFields() {
@@ -220,6 +266,50 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
     ]);
   }
 
+  function solveInequality() {
+    const av = toNumber(a);
+    const bv = toNumber(b);
+
+    if (Number.isNaN(av) || Number.isNaN(bv)) {
+      setResultTitle("Введите корректные коэффициенты a и b.");
+      setSteps([]);
+      return;
+    }
+
+    if (av === 0) {
+      const isTrue = checkConstantInequality(bv, inequalityOperator);
+
+      if (isTrue) {
+        setResultTitle("Подходит любое число x.");
+        setSteps([
+          `${formatNumber(bv)} ${inequalityOperator} 0`,
+          "Неравенство истинно при любом x."
+        ]);
+        return;
+      }
+
+      setResultTitle("Решений нет.");
+      setSteps([
+        `${formatNumber(bv)} ${inequalityOperator} 0`,
+        "Неравенство ложно при любом x."
+      ]);
+      return;
+    }
+
+    const border = -bv / av;
+    const finalOperator = av > 0 ? inequalityOperator : invertOperator(inequalityOperator);
+
+    setResultTitle(`x ${finalOperator} ${formatNumber(border)}`);
+    setSteps([
+      `${formatNumber(av)}x + ${formatNumber(bv)} ${inequalityOperator} 0`,
+      `${formatNumber(av)}x ${inequalityOperator} ${formatNumber(-bv)}`,
+      av > 0
+        ? `Делим обе части на положительное число ${formatNumber(av)}. Знак не меняется.`
+        : `Делим обе части на отрицательное число ${formatNumber(av)}. Знак меняется на противоположный.`,
+      `x ${finalOperator} ${formatNumber(border)}`
+    ]);
+  }
+
   function handleSolve() {
     if (mode === "linear") {
       solveLinear();
@@ -231,13 +321,18 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
       return;
     }
 
-    solveSystem();
+    if (mode === "system") {
+      solveSystem();
+      return;
+    }
+
+    solveInequality();
   }
 
   return (
     <Screen theme={theme}>
       <Text style={styles.title}>Решатель</Text>
-      <Text style={styles.subtitle}>Решение уравнений с пошаговым объяснением.</Text>
+      <Text style={styles.subtitle}>Решение уравнений и неравенств с пошаговым объяснением.</Text>
 
       <SectionCard title="Как пользоваться" subtitle="Короткая инструкция" theme={theme}>
         <Text style={styles.stepText}>1. Выберите тип задачи.</Text>
@@ -282,12 +377,63 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
             variant={mode === "system" ? undefined : "secondary"}
           />
         </View>
+
+        <View style={styles.modeItem}>
+          <AppButton
+            label="Неравенство"
+            onPress={() => {
+              setMode("inequality");
+              resetFields();
+            }}
+            theme={theme}
+            variant={mode === "inequality" ? undefined : "secondary"}
+          />
+        </View>
       </SectionCard>
 
       <SectionCard title={modeTitle} subtitle="Формула и пример" theme={theme}>
         <Text style={styles.resultTitle}>{modeFormula}</Text>
         <Text style={styles.stepText}>{modeExample}</Text>
       </SectionCard>
+
+      {mode === "inequality" ? (
+        <SectionCard title="Знак неравенства" subtitle="Выберите знак" theme={theme}>
+          <View style={styles.operatorRow}>
+            <View style={styles.operatorItem}>
+              <AppButton
+                label=">"
+                onPress={() => setInequalityOperator(">")}
+                theme={theme}
+                variant={inequalityOperator === ">" ? undefined : "secondary"}
+              />
+            </View>
+            <View style={styles.operatorItem}>
+              <AppButton
+                label=">="
+                onPress={() => setInequalityOperator(">=")}
+                theme={theme}
+                variant={inequalityOperator === ">=" ? undefined : "secondary"}
+              />
+            </View>
+            <View style={styles.operatorItem}>
+              <AppButton
+                label="<"
+                onPress={() => setInequalityOperator("<")}
+                theme={theme}
+                variant={inequalityOperator === "<" ? undefined : "secondary"}
+              />
+            </View>
+            <View style={styles.operatorItem}>
+              <AppButton
+                label="<="
+                onPress={() => setInequalityOperator("<=")}
+                theme={theme}
+                variant={inequalityOperator === "<=" ? undefined : "secondary"}
+              />
+            </View>
+          </View>
+        </SectionCard>
+      ) : null}
 
       <SectionCard title={modeTitle} subtitle="Введите коэффициенты" theme={theme}>
         <View style={styles.inputGroup}>
@@ -400,6 +546,14 @@ function createStyles(theme: AppTheme) {
     },
     modeItem: {
       marginBottom: theme.spacing.sm
+    },
+    operatorRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: theme.spacing.sm
+    },
+    operatorItem: {
+      minWidth: 72
     },
     inputGroup: {
       marginBottom: theme.spacing.md
