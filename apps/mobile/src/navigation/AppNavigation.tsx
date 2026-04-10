@@ -18,6 +18,7 @@ import { ProfileScreen } from "../screens/ProfileScreen";
 import { SessionScreen } from "../screens/SessionScreen";
 import { SolverScreen } from "../screens/SolverScreen";
 import { VideoLessonsScreen, type VideoLessonItem } from "../screens/VideoLessonsScreen";
+import { PhotoMaterialsScreen, type PhotoMaterialItem } from "../screens/PhotoMaterialsScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
 import { TeacherHomeScreen, type DraftLectureInput, type DraftLectureMetaInput, type DraftQuestionInput } from "../screens/TeacherHomeScreen";
@@ -59,6 +60,7 @@ type ScreenKey =
   | "teacherSession"
   | "solver"
   | "videoLessons"
+  | "photoMaterials"
   | "profile";
 
 type LoginRole = "student" | "teacher";
@@ -557,11 +559,51 @@ function writeVideoLessons(value: VideoLessonItem[]) {
     storage.setItem(VIDEO_LESSONS_STORAGE_KEY, JSON.stringify(value));
   } catch {}
 }
+
+const PHOTO_MATERIALS_STORAGE_KEY = "vm_mobile_photo_materials_v1";
+
+function readPhotoMaterials(): PhotoMaterialItem[] {
+  try {
+    const storage = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    if (!storage) {
+      return [];
+    }
+
+    const raw = storage.getItem(PHOTO_MATERIALS_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as PhotoMaterialItem[];
+    return Array.isArray(parsed)
+      ? parsed.map((item) => ({
+          ...item,
+          title: fixText(String(item.title ?? "")),
+          note: fixText(String(item.note ?? "")),
+          authorName: fixText(String(item.authorName ?? ""))
+        }))
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePhotoMaterials(value: PhotoMaterialItem[]) {
+  try {
+    const storage = (globalThis as typeof globalThis & { localStorage?: Storage }).localStorage;
+    if (!storage) {
+      return;
+    }
+
+    storage.setItem(PHOTO_MATERIALS_STORAGE_KEY, JSON.stringify(value));
+  } catch {}
+}
 export function AppNavigation() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeScreen, setActiveScreen] = useState<ScreenKey>("catalog");
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [user, setUser] = useState<UserProfile>(mockUser);
   const [catalogLectures, setCatalogLectures] = useState<LectureItem[]>(mockLectures);
@@ -571,6 +613,7 @@ export function AppNavigation() {
   const [lectureDetailsById, setLectureDetailsById] = useState<Record<string, LectureDetails>>({});
   const [draftsLoaded, setDraftsLoaded] = useState(false);
   const [videoLessons, setVideoLessons] = useState<VideoLessonItem[]>(readVideoLessons());
+  const [photoMaterials, setPhotoMaterials] = useState<PhotoMaterialItem[]>(readPhotoMaterials());
 
   useEffect(() => {
     const savedDrafts = readDraftStorage();
@@ -803,11 +846,11 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
   role: LoginRole
 ): Promise<string | null> {
   if (!login.trim() || !password.trim()) {
-    return "Р’РІРµРґРёС‚Рµ Р»РѕРіРёРЅ Рё РїР°СЂРѕР»СЊ.";
+    return "Р вЂ™Р Р†Р ВµР Т‘Р С‘РЎвЂљР Вµ Р В»Р С•Р С–Р С‘Р Р… Р С‘ Р С—Р В°РЎР‚Р С•Р В»РЎРЉ.";
   }
 
   const nextUser: UserProfile = {
-    fullName: role === "teacher" ? "РўРµСЃС‚РѕРІС‹Р№ РїСЂРµРїРѕРґР°РІР°С‚РµР»СЊ" : "РўРµСЃС‚РѕРІС‹Р№ СЃС‚СѓРґРµРЅС‚",
+    fullName: role === "teacher" ? "Р СћР ВµРЎРѓРЎвЂљР С•Р Р†РЎвЂ№Р в„– Р С—РЎР‚Р ВµР С—Р С•Р Т‘Р В°Р Р†Р В°РЎвЂљР ВµР В»РЎРЉ" : "Р СћР ВµРЎРѓРЎвЂљР С•Р Р†РЎвЂ№Р в„– РЎРѓРЎвЂљРЎС“Р Т‘Р ВµР Р…РЎвЂљ",
     login: login.trim(),
     role,
     group: mockUser.group
@@ -1253,6 +1296,75 @@ async function handleLogout() {
     }
   }
 
+
+  function handleCreatePhotoMaterial(input: { title: string; imageUrl: string; note: string }) {
+    const nextTitle = input.title.trim();
+    const nextImageUrl = input.imageUrl.trim();
+    const nextNote = input.note.trim();
+
+    if (!nextTitle || !nextImageUrl) {
+      return;
+    }
+
+    const nextMaterial: PhotoMaterialItem = {
+      id: `photo-material-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: nextTitle,
+      imageUrl: nextImageUrl,
+      note: nextNote,
+      authorName: user.fullName || "Visual Math Team",
+      createdAt: new Date().toISOString()
+    };
+
+    setPhotoMaterials((current: PhotoMaterialItem[]) => [nextMaterial, ...current]);
+  }
+
+  function handleDeletePhotoMaterial(materialId: string) {
+    setPhotoMaterials((current: PhotoMaterialItem[]) =>
+      current.filter((material: PhotoMaterialItem) => material.id !== materialId)
+    );
+  }
+  function handleMenuNavigate(
+      screen: "catalog" | "solver" | "videoLessons" | "photoMaterials" | "profile"
+    ) {
+      setIsMenuOpen(false);
+
+      if (screen === "profile") {
+        resetTeacherFlow();
+        setActiveScreen("profile");
+        return;
+      }
+
+      if (screen === "solver") {
+        resetStudentFlow();
+        resetTeacherFlow();
+        setActiveScreen("solver");
+        return;
+      }
+
+      if (screen === "videoLessons") {
+        resetStudentFlow();
+        resetTeacherFlow();
+        setActiveScreen("videoLessons");
+        return;
+      }
+
+      if (screen === "photoMaterials") {
+        resetStudentFlow();
+        resetTeacherFlow();
+        setActiveScreen("photoMaterials");
+        return;
+      }
+
+      resetTeacherFlow();
+
+      if (isTeacher) {
+        setActiveScreen("teacherHome");
+        return;
+      }
+
+      handleBackToCatalog();
+    }
+
   function handleBottomTabChange(
       screen: "catalog" | "solver" | "videoLessons" | "profile"
     ) {
@@ -1304,6 +1416,120 @@ async function handleLogout() {
 
   return (
     <View style={styles.container}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: theme.spacing.md,
+          paddingTop: theme.spacing.md,
+          paddingBottom: theme.spacing.sm,
+          backgroundColor: theme.colors.surface,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.colors.border
+        }}
+      >
+        <Pressable
+          onPress={() => setIsMenuOpen((current) => !current)}
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: theme.colors.surfaceMuted
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 24,
+              lineHeight: 24,
+              fontWeight: "800",
+              color: theme.colors.text
+            }}
+          >
+            ⋯
+          </Text>
+        </Pressable>
+
+        <Text
+          style={{
+            fontSize: theme.typography.screenTitle,
+            fontWeight: "800",
+            color: theme.colors.text
+          }}
+        >
+          VisualMath
+        </Text>
+
+        <View style={{ width: 40, height: 40 }} />
+      </View>
+
+      {isMenuOpen ? (
+        <View
+          style={{
+            position: "absolute",
+            top: 72,
+            left: theme.spacing.md,
+            zIndex: 50,
+            minWidth: 220,
+            borderRadius: 18,
+            borderWidth: 1,
+            borderColor: theme.colors.border,
+            backgroundColor: theme.colors.surface,
+            padding: theme.spacing.sm,
+            shadowColor: "#000000",
+            shadowOpacity: 0.12,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 6 },
+            elevation: 8
+          }}
+        >
+          {[
+            { key: "catalog", label: "Каталог" },
+            { key: "profile", label: "Профиль" },
+            { key: "videoLessons", label: "Видеоуроки" },
+            { key: "photoMaterials", label: "Фото" },
+            { key: "solver", label: "Уравнения" }
+          ].map((item) => (
+            <Pressable
+              key={item.key}
+              onPress={() =>
+                handleMenuNavigate(
+                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "profile"
+                )
+              }
+              style={{
+                paddingVertical: theme.spacing.sm,
+                paddingHorizontal: theme.spacing.md,
+                borderRadius: 12,
+                backgroundColor:
+                  (item.key === "catalog" &&
+                    (activeScreen === "catalog" ||
+                      activeScreen === "details" ||
+                      activeScreen === "session" ||
+                      activeScreen === "task" ||
+                      activeScreen === "result" ||
+                      activeScreen === "teacherHome" ||
+                      activeScreen === "teacherSession")) ||
+                  activeScreen === item.key
+                    ? theme.colors.surfaceMuted
+                    : theme.colors.surface
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: theme.typography.body,
+                  fontWeight: "700",
+                  color: theme.colors.text
+                }}
+              >
+                {item.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       <View style={styles.content}>
         {!isTeacher && activeScreen === "catalog" ? (
           <CatalogScreen
@@ -1403,6 +1629,16 @@ async function handleLogout() {
             onDeleteLesson={handleDeleteVideoLesson}
           />
         ) : null}
+
+        {activeScreen === "photoMaterials" ? (
+          <PhotoMaterialsScreen
+            theme={theme}
+            isTeacher={isTeacher}
+            materials={photoMaterials}
+            onCreateMaterial={handleCreatePhotoMaterial}
+            onDeleteMaterial={handleDeletePhotoMaterial}
+          />
+        ) : null}
           {activeScreen === "profile" ? (
           <ProfileScreen
             theme={theme}
@@ -1429,96 +1665,8 @@ async function handleLogout() {
           />
         ) : null}
       </View>
-
-      <View
-        style={{
-          flexDirection: "row",
-          gap: theme.spacing.sm,
-          paddingHorizontal: theme.spacing.md,
-          paddingTop: theme.spacing.sm,
-          paddingBottom: theme.spacing.md,
-          borderTopWidth: 1,
-          borderTopColor: theme.colors.border,
-          backgroundColor: theme.colors.surface
-        }}
-      >
-        {[
-          { key: "catalog", label: "\u041a\u0430\u0442\u0430\u043b\u043e\u0433" },
-          { key: "solver", label: "\u0423\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f" },
-          { key: "videoLessons", label: "\u0412\u0438\u0434\u0435\u043e\u0443\u0440\u043e\u043a\u0438" },
-          { key: "profile", label: "\u041f\u0440\u043e\u0444\u0438\u043b\u044c" }
-        ].map((item) => {
-          const isActive =
-            item.key === "catalog"
-              ? activeScreen === "catalog" ||
-                activeScreen === "details" ||
-                activeScreen === "session" ||
-                activeScreen === "task" ||
-                activeScreen === "result" ||
-                activeScreen === "teacherHome" ||
-                activeScreen === "teacherSession"
-              : activeScreen === item.key;
-
-          return (
-            <Pressable
-              key={item.key}
-              onPress={() => {
-                if (item.key === "videoLessons") {
-                  resetStudentFlow();
-                  resetTeacherFlow();
-                  setActiveScreen("videoLessons");
-                  return;
-                }
-
-                if (item.key === "solver") {
-                  resetStudentFlow();
-                  resetTeacherFlow();
-                  setActiveScreen("solver");
-                  return;
-                }
-
-                if (item.key === "profile") {
-                  resetTeacherFlow();
-                  setActiveScreen("profile");
-                  return;
-                }
-
-                resetTeacherFlow();
-
-                if (isTeacher) {
-                  setActiveScreen("teacherHome");
-                  return;
-                }
-
-                handleBackToCatalog();
-              }}
-              style={{
-                flex: 1,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingVertical: theme.spacing.sm,
-                borderRadius: theme.radius.md,
-                backgroundColor: isActive
-                  ? theme.colors.surfaceMuted
-                  : theme.colors.surface
-              }}
-            >
-              <Text
-                style={{
-                  color: isActive ? theme.colors.primary : theme.colors.textSecondary,
-                  fontSize: theme.typography.body,
-                  fontWeight: "700"
-                }}
-              >
-                {item.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
     </View>
-  );
-}
+  );}
 
 type BottomTabsProps = {
   theme: AppTheme;
