@@ -3,9 +3,11 @@ import {
   Axis2D,
   Circle2D,
   Grid2D,
+  Label2D,
   Line2D,
   Point2D,
   Polyline2D,
+  Rectangle2D,
 } from "../renderer2d/primitives";
 import type { Scene2DJSON, SceneObjectJSON } from "./schema";
 
@@ -23,6 +25,10 @@ export function createObjectFromJSON(data: SceneObjectJSON) {
       return new Axis2D(data);
     case "circle2d":
       return new Circle2D(data);
+    case "rectangle2d":
+      return new Rectangle2D(data);
+    case "label2d":
+      return new Label2D(data);
     default: {
       const unsupported: never = data;
       throw new Error(`Unsupported object type: ${(unsupported as { type?: string }).type ?? "unknown"}`);
@@ -44,5 +50,5 @@ export function createSceneFromJSON(data: Scene2DJSON): Scene2D {
 }
 
 export function serializeScene(scene: Scene2D): Scene2DJSON {
-  return scene.toJSON() as Scene2DJSON;
+  return scene.toJSON();
 }

@@ -53,13 +53,31 @@ export interface Circle2DJSON extends BaseObjectJSON {
   radius: number;
 }
 
+export interface Rectangle2DJSON extends BaseObjectJSON {
+  type: "rectangle2d";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Label2DJSON extends BaseObjectJSON {
+  type: "label2d";
+  x: number;
+  y: number;
+  text: string;
+  font?: string;
+}
+
 export type SceneObjectJSON =
   | Point2DJSON
   | Line2DJSON
   | Polyline2DJSON
   | Grid2DJSON
   | Axis2DJSON
-  | Circle2DJSON;
+  | Circle2DJSON
+  | Rectangle2DJSON
+  | Label2DJSON;
 
 export interface Scene2DJSON {
   version: number;

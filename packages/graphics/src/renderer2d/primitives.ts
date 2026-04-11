@@ -4,9 +4,12 @@ import type {
   Axis2DJSON,
   Circle2DJSON,
   Grid2DJSON,
+  Label2DJSON,
   Line2DJSON,
   Point2DJSON,
   Polyline2DJSON,
+  Rectangle2DJSON,
+  SceneObjectJSON,
 } from "../serialize/schema";
 
 export interface BasePrimitiveOptions {
@@ -56,6 +59,20 @@ export interface Circle2DOptions extends BasePrimitiveOptions {
   radius: number;
 }
 
+export interface Rectangle2DOptions extends BasePrimitiveOptions {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface Label2DOptions extends BasePrimitiveOptions {
+  x: number;
+  y: number;
+  text: string;
+  font?: string;
+}
+
 abstract class BasePrimitive implements Renderable {
   id: string;
   type: string;
@@ -74,7 +91,7 @@ abstract class BasePrimitive implements Renderable {
   }
 
   abstract render(context: CanvasRenderingContext2D, camera: Camera2D): void;
-  abstract toJSON(): import("../serialize/schema").SceneObjectJSON;
+  abstract toJSON(): SceneObjectJSON;
 }
 
 export class Point2D extends BasePrimitive {
@@ -403,6 +420,106 @@ export class Circle2D extends BasePrimitive {
       x: this.x,
       y: this.y,
       radius: this.radius,
+      strokeStyle: this.strokeStyle,
+      fillStyle: this.fillStyle,
+      lineWidth: this.lineWidth,
+    };
+  }
+}
+
+export class Rectangle2D extends BasePrimitive {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+
+  constructor(options: Rectangle2DOptions) {
+    super("rectangle2d", options);
+    this.x = options.x;
+    this.y = options.y;
+    this.width = options.width;
+    this.height = options.height;
+  }
+
+  render(context: CanvasRenderingContext2D, camera: Camera2D): void {
+    if (!this.visible) return;
+
+    const topLeft = camera.worldToScreen(
+      { x: this.x, y: this.y + this.height },
+      context.canvas.width,
+      context.canvas.height
+    );
+
+    const pixelWidth = this.width * camera.zoom;
+    const pixelHeight = this.height * camera.zoom;
+
+    context.save();
+    context.beginPath();
+    context.strokeStyle = this.strokeStyle;
+    context.lineWidth = this.lineWidth;
+    context.rect(topLeft.x, topLeft.y, pixelWidth, pixelHeight);
+
+    if (this.fillStyle !== "transparent") {
+      context.fillStyle = this.fillStyle;
+      context.fill();
+    }
+
+    context.stroke();
+    context.restore();
+  }
+
+  toJSON(): Rectangle2DJSON {
+    return {
+      type: "rectangle2d",
+      id: this.id,
+      visible: this.visible,
+      x: this.x,
+      y: this.y,
+      width: this.width,
+      height: this.height,
+      strokeStyle: this.strokeStyle,
+      fillStyle: this.fillStyle,
+      lineWidth: this.lineWidth,
+    };
+  }
+}
+
+export class Label2D extends BasePrimitive {
+  x: number;
+  y: number;
+  text: string;
+  font: string;
+
+  constructor(options: Label2DOptions) {
+    super("label2d", options);
+    this.x = options.x;
+    this.y = options.y;
+    this.text = options.text;
+    this.font = options.font ?? "14px sans-serif";
+    this.fillStyle = options.fillStyle ?? "#111827";
+  }
+
+  render(context: CanvasRenderingContext2D, camera: Camera2D): void {
+    if (!this.visible) return;
+
+    const screen = camera.worldToScreen({ x: this.x, y: this.y }, context.canvas.width, context.canvas.height);
+
+    context.save();
+    context.font = this.font;
+    context.fillStyle = this.fillStyle;
+    context.fillText(this.text, screen.x, screen.y);
+    context.restore();
+  }
+
+  toJSON(): Label2DJSON {
+    return {
+      type: "label2d",
+      id: this.id,
+      visible: this.visible,
+      x: this.x,
+      y: this.y,
+      text: this.text,
+      font: this.font,
       strokeStyle: this.strokeStyle,
       fillStyle: this.fillStyle,
       lineWidth: this.lineWidth,
