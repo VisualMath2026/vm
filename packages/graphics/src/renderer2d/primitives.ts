@@ -75,6 +75,10 @@ export interface Label2DOptions extends BasePrimitiveOptions {
   font?: string;
 }
 
+export interface FunctionExpressionOptions extends Omit<FunctionGraph2DOptions, "fn"> {
+  expression: string;
+}
+
 abstract class BasePrimitive implements Renderable {
   id: string;
   type: string;
@@ -556,4 +560,27 @@ export class Label2D extends BasePrimitive {
 
 export function plotFunction(options: FunctionGraph2DOptions): FunctionGraph2D {
   return new FunctionGraph2D(options);
+}
+
+export function compileFunctionExpression(expression: string): (x: number) => number {
+  const normalized = expression
+    .replace(/\^/g, "**")
+    .replace(/\babs\(/g, "Math.abs(")
+    .replace(/\bsin\(/g, "Math.sin(")
+    .replace(/\bcos\(/g, "Math.cos(")
+    .replace(/\btan\(/g, "Math.tan(")
+    .replace(/\bsqrt\(/g, "Math.sqrt(")
+    .replace(/\blog\(/g, "Math.log(")
+    .replace(/\bexp\(/g, "Math.exp(")
+    .replace(/\bPI\b/g, "Math.PI")
+    .replace(/\bE\b/g, "Math.E");
+
+  return new Function("x", `return ${normalized};`) as (x: number) => number;
+}
+
+export function plotFunctionExpression(options: FunctionExpressionOptions): FunctionGraph2D {
+  return new FunctionGraph2D({
+    ...options,
+    fn: compileFunctionExpression(options.expression),
+  });
 }

@@ -13,22 +13,128 @@
       canvas {
         border: 1px solid #ccc;
         background: white;
+        display: block;
+        margin-top: 16px;
       }
-      p {
-        max-width: 900px;
+      .controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin: 12px 0;
+      }
+      input {
+        width: 360px;
+        padding: 10px 12px;
+        font-size: 16px;
+      }
+      button {
+        padding: 10px 14px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      code {
+        background: #eee;
+        padding: 2px 6px;
+        border-radius: 4px;
       }
     </style>
   </head>
   <body>
     <h1>VM Graphics Demo</h1>
-    <p>Pan: drag with mouse. Zoom: mouse wheel. Demo renders several function graphs, including a discontinuous one.</p>
+    <p>Pan: drag with mouse. Zoom: mouse wheel.</p>
+    <p>Examples: <code>sin(x)</code>, <code>x^2/8 - 3</code>, <code>3/x</code>, <code>abs(x) - 4</code>, <code>cos(x) + x/3</code></p>
+
+    <div class="controls">
+      <label for="expr">f(x) =</label>
+      <input id="expr" value="sin(x)" />
+      <button id="plot">Plot</button>
+    </div>
+
     <canvas id="canvas" width="1200" height="720"></canvas>
 
     <script type="module">
-      import { createDemo2D } from "./dist/index.js";
+      import {
+        Scene2D,
+        Grid2D,
+        Axis2D,
+        Label2D,
+        Interaction2D,
+        plotFunctionExpression
+      } from "./dist/index.js";
 
       const canvas = document.getElementById("canvas");
-      createDemo2D(canvas);
+      const exprInput = document.getElementById("expr");
+      const plotButton = document.getElementById("plot");
+      const context = canvas.getContext("2d");
+
+      const scene = new Scene2D({
+        background: "#ffffff",
+        camera: { x: 0, y: 0, zoom: 45, minZoom: 10, maxZoom: 400 },
+      });
+
+      scene
+        .add(new Grid2D({ id: "grid", step: 1, extent: 20 }))
+        .add(new Axis2D({ id: "axis", extent: 20, strokeStyle: "#111827", lineWidth: 2 }));
+
+      let graphId = 0;
+
+      function render() {
+        scene.render(context);
+      }
+
+      function plotExpression(expression) {
+        scene.objects = scene.objects.filter((obj) => !obj.id.startsWith("user-"));
+
+        graphId += 1;
+
+        scene
+          .add(
+            plotFunctionExpression({
+              id: `user-graph-${graphId}`,
+              expression,
+              xMin: -10,
+              xMax: 10,
+              samples: 1000,
+              strokeStyle: "#2563eb",
+              lineWidth: 2,
+              breakOnDiscontinuity: true,
+              discontinuityThreshold: 4,
+            })
+          )
+          .add(
+            new Label2D({
+              id: `user-label-${graphId}`,
+              x: 4,
+              y: 4,
+              text: `f(x) = ${expression}`,
+              fillStyle: "#2563eb",
+              font: "18px sans-serif",
+            })
+          );
+
+        render();
+      }
+
+      plotButton.addEventListener("click", () => {
+        try {
+          plotExpression(exprInput.value.trim());
+        } catch (error) {
+          alert("Invalid expression");
+          console.error(error);
+        }
+      });
+
+      exprInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          plotButton.click();
+        }
+      });
+
+      const interaction = new Interaction2D(canvas, scene, { onChange: render });
+      interaction.attach();
+
+      plotExpression(exprInput.value.trim());
     </script>
   </body>
 </html>

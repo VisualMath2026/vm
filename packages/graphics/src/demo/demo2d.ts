@@ -2,10 +2,9 @@ import { Scene2D } from "../core/scene2d.js";
 import { Interaction2D } from "../interaction/interaction2d.js";
 import {
   Axis2D,
-  FunctionGraph2D,
   Grid2D,
   Label2D,
-  plotFunction,
+  plotFunctionExpression,
 } from "../renderer2d/primitives.js";
 
 export interface Demo2DController {
@@ -30,9 +29,9 @@ export function createDemo2D(canvas: HTMLCanvasElement): Demo2DController {
     .add(new Grid2D({ id: "grid", step: 1, extent: 20 }))
     .add(new Axis2D({ id: "axis", extent: 20, strokeStyle: "#111827", lineWidth: 2 }))
     .add(
-      plotFunction({
+      plotFunctionExpression({
         id: "sin",
-        fn: (x: number) => Math.sin(x),
+        expression: "sin(x)",
         xMin: -10,
         xMax: 10,
         samples: 600,
@@ -41,9 +40,9 @@ export function createDemo2D(canvas: HTMLCanvasElement): Demo2DController {
       })
     )
     .add(
-      plotFunction({
+      plotFunctionExpression({
         id: "parabola",
-        fn: (x: number) => (x * x) / 8 - 3,
+        expression: "x^2/8 - 3",
         xMin: -8,
         xMax: 8,
         samples: 500,
@@ -52,9 +51,9 @@ export function createDemo2D(canvas: HTMLCanvasElement): Demo2DController {
       })
     )
     .add(
-      plotFunction({
+      plotFunctionExpression({
         id: "hyperbola",
-        fn: (x: number) => 3 / x,
+        expression: "3/x",
         xMin: -10,
         xMax: 10,
         samples: 1200,
@@ -65,9 +64,9 @@ export function createDemo2D(canvas: HTMLCanvasElement): Demo2DController {
       })
     )
     .add(
-      plotFunction({
+      plotFunctionExpression({
         id: "abs",
-        fn: (x: number) => Math.abs(x) - 4,
+        expression: "abs(x) - 4",
         xMin: -10,
         xMax: 10,
         samples: 400,
