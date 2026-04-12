@@ -1,13 +1,12 @@
-import { Scene2D } from "../core/scene2d";
-import { Interaction2D } from "../interaction/interaction2d";
+import { Scene2D } from "../core/scene2d.js";
+import { Interaction2D } from "../interaction/interaction2d.js";
 import {
   Axis2D,
-  Circle2D,
   FunctionGraph2D,
   Grid2D,
-  Line2D,
-  Point2D,
-} from "../renderer2d/primitives";
+  Label2D,
+  plotFunction,
+} from "../renderer2d/primitives.js";
 
 export interface Demo2DController {
   scene: Scene2D;
@@ -24,26 +23,62 @@ export function createDemo2D(canvas: HTMLCanvasElement): Demo2DController {
 
   const scene = new Scene2D({
     background: "#ffffff",
-    camera: { x: 0, y: 0, zoom: 40, minZoom: 10, maxZoom: 400 },
+    camera: { x: 0, y: 0, zoom: 45, minZoom: 10, maxZoom: 400 },
   });
 
   scene
     .add(new Grid2D({ id: "grid", step: 1, extent: 20 }))
     .add(new Axis2D({ id: "axis", extent: 20, strokeStyle: "#111827", lineWidth: 2 }))
     .add(
-      new FunctionGraph2D({
+      plotFunction({
         id: "sin",
-        fn: (x) => Math.sin(x),
+        fn: (x: number) => Math.sin(x),
         xMin: -10,
         xMax: 10,
-        samples: 400,
+        samples: 600,
         strokeStyle: "#2563eb",
         lineWidth: 2,
       })
     )
-    .add(new Point2D({ id: "p0", x: 0, y: 0, radius: 5, strokeStyle: "#dc2626" }))
-    .add(new Circle2D({ id: "c0", x: 2, y: 1, radius: 0.5, strokeStyle: "#16a34a", lineWidth: 2 }))
-    .add(new Line2D({ id: "l0", x1: -2, y1: -1, x2: 3, y2: 2, strokeStyle: "#7c3aed", lineWidth: 2 }));
+    .add(
+      plotFunction({
+        id: "parabola",
+        fn: (x: number) => (x * x) / 8 - 3,
+        xMin: -8,
+        xMax: 8,
+        samples: 500,
+        strokeStyle: "#dc2626",
+        lineWidth: 2,
+      })
+    )
+    .add(
+      plotFunction({
+        id: "hyperbola",
+        fn: (x: number) => 3 / x,
+        xMin: -10,
+        xMax: 10,
+        samples: 1200,
+        strokeStyle: "#16a34a",
+        lineWidth: 2,
+        breakOnDiscontinuity: true,
+        discontinuityThreshold: 3,
+      })
+    )
+    .add(
+      plotFunction({
+        id: "abs",
+        fn: (x: number) => Math.abs(x) - 4,
+        xMin: -10,
+        xMax: 10,
+        samples: 400,
+        strokeStyle: "#7c3aed",
+        lineWidth: 2,
+      })
+    )
+    .add(new Label2D({ id: "l1", x: 5.5, y: 1.5, text: "y = sin(x)", fillStyle: "#2563eb", font: "16px sans-serif" }))
+    .add(new Label2D({ id: "l2", x: 4.5, y: 0.5, text: "y = 3/x", fillStyle: "#16a34a", font: "16px sans-serif" }))
+    .add(new Label2D({ id: "l3", x: 2.5, y: -2.5, text: "y = |x| - 4", fillStyle: "#7c3aed", font: "16px sans-serif" }))
+    .add(new Label2D({ id: "l4", x: 3.5, y: -0.8, text: "y = x²/8 - 3", fillStyle: "#dc2626", font: "16px sans-serif" }));
 
   const render = () => {
     scene.render(context);

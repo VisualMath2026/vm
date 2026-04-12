@@ -1,5 +1,5 @@
-import type { Renderable } from "../core/renderable";
-import type { Camera2D } from "../core/camera2d";
+import type { Renderable } from "../core/renderable.js";
+import type { Camera2D } from "../core/camera2d.js";
 import type {
   Axis2DJSON,
   Circle2DJSON,
@@ -10,7 +10,7 @@ import type {
   Polyline2DJSON,
   Rectangle2DJSON,
   SceneObjectJSON,
-} from "../serialize/schema";
+} from "../serialize/schema.js";
 
 export interface BasePrimitiveOptions {
   id: string;
@@ -51,6 +51,8 @@ export interface FunctionGraph2DOptions extends BasePrimitiveOptions {
   xMin?: number;
   xMax?: number;
   samples?: number;
+  breakOnDiscontinuity?: boolean;
+  discontinuityThreshold?: number;
 }
 
 export interface Circle2DOptions extends BasePrimitiveOptions {
@@ -325,49 +327,74 @@ export class FunctionGraph2D extends BasePrimitive {
   xMin: number;
   xMax: number;
   samples: number;
+  breakOnDiscontinuity: boolean;
+  discontinuityThreshold: number;
 
   constructor(options: FunctionGraph2DOptions) {
     super("functionGraph2d", options);
     this.fn = options.fn;
     this.xMin = options.xMin ?? -10;
     this.xMax = options.xMax ?? 10;
-    this.samples = options.samples ?? 200;
+    this.samples = options.samples ?? 400;
+    this.breakOnDiscontinuity = options.breakOnDiscontinuity ?? true;
+    this.discontinuityThreshold = options.discontinuityThreshold ?? 20;
+  }
+
+  private buildSegments(): Array<Array<{ x: number; y: number }>> {
+    const segments: Array<Array<{ x: number; y: number }>> = [];
+    let current: Array<{ x: number; y: number }> = [];
+    const step = (this.xMax - this.xMin) / this.samples;
+    let previousY: number | null = null;
+
+    for (let i = 0; i <= this.samples; i += 1) {
+      const x = this.xMin + i * step;
+      const y = this.fn(x);
+
+      if (!Number.isFinite(y)) {
+        if (current.length > 1) segments.push(current);
+        current = [];
+        previousY = null;
+        continue;
+      }
+
+      if (
+        this.breakOnDiscontinuity &&
+        previousY !== null &&
+        Math.abs(y - previousY) > this.discontinuityThreshold
+      ) {
+        if (current.length > 1) segments.push(current);
+        current = [];
+      }
+
+      current.push({ x, y });
+      previousY = y;
+    }
+
+    if (current.length > 1) {
+      segments.push(current);
+    }
+
+    return segments;
   }
 
   render(context: CanvasRenderingContext2D, camera: Camera2D): void {
     if (!this.visible) return;
 
-    const points: Array<{ x: number; y: number }> = [];
-    const step = (this.xMax - this.xMin) / this.samples;
+    const segments = this.buildSegments();
 
-    for (let i = 0; i <= this.samples; i += 1) {
-      const x = this.xMin + i * step;
-      const y = this.fn(x);
-      if (Number.isFinite(y)) {
-        points.push({ x, y });
-      }
+    for (const segment of segments) {
+      new Polyline2D({
+        id: `${this.id}__segment`,
+        points: segment,
+        strokeStyle: this.strokeStyle,
+        lineWidth: this.lineWidth,
+        visible: this.visible,
+      }).render(context, camera);
     }
-
-    new Polyline2D({
-      id: `${this.id}__polyline`,
-      points,
-      strokeStyle: this.strokeStyle,
-      lineWidth: this.lineWidth,
-      visible: this.visible,
-    }).render(context, camera);
   }
 
   toJSON(): Polyline2DJSON {
-    const points: Array<{ x: number; y: number }> = [];
-    const step = (this.xMax - this.xMin) / this.samples;
-
-    for (let i = 0; i <= this.samples; i += 1) {
-      const x = this.xMin + i * step;
-      const y = this.fn(x);
-      if (Number.isFinite(y)) {
-        points.push({ x, y });
-      }
-    }
+    const points = this.buildSegments().flat();
 
     return {
       type: "polyline2d",
@@ -525,4 +552,8 @@ export class Label2D extends BasePrimitive {
       lineWidth: this.lineWidth,
     };
   }
+}
+
+export function plotFunction(options: FunctionGraph2DOptions): FunctionGraph2D {
+  return new FunctionGraph2D(options);
 }
