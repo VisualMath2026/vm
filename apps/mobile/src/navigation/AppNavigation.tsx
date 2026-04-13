@@ -879,9 +879,11 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
 }
 
 async function handleGoogleLogin(payload: GoogleLoginPayload): Promise<string | null> {
+  const safeEmail = (payload.email ?? "").trim();
+  const safeName = (payload.name ?? payload.fullName ?? "").trim();
   const nextUser: UserProfile = {
-    fullName: payload.name.trim() || payload.email.trim(),
-    login: payload.email.trim(),
+    fullName: safeName || safeEmail || "Google пользователь",
+    login: safeEmail || "google_user",
     role: "student",
     group: mockUser.group
   };

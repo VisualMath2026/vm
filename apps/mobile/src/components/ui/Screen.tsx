@@ -1,5 +1,4 @@
-import React from "react";
-
+﻿import React from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -34,11 +33,14 @@ export function Screen({
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
-            {children}
+            <View style={styles.inner}>{children}</View>
           </ScrollView>
         ) : (
-          <View style={styles.content}>{children}</View>
+          <View style={styles.content}>
+            <View style={styles.inner}>{children}</View>
+          </View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -61,6 +63,11 @@ function createStyles(theme: AppTheme) {
     content: {
       flex: 1,
       padding: theme.spacing.lg
+    },
+    inner: {
+      width: "100%",
+      maxWidth: 1240,
+      alignSelf: "center"
     }
   });
 }

@@ -1,8 +1,7 @@
-import React from "react";
-
+﻿import React from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { fixText } from "../../utils/fixText";
 
+import { fixText } from "../../utils/fixText";
 import type { AppTheme } from "../../theme";
 
 type ScreenHeaderProps = {
@@ -22,12 +21,14 @@ export function ScreenHeader({
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.textBlock}>
-        <Text style={styles.title}>{fixText(title)}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle ? fixText(subtitle) : subtitle}</Text> : null}
-      </View>
+      <View style={styles.row}>
+        <View style={styles.textBlock}>
+          <Text style={styles.title}>{fixText(title)}</Text>
+          {subtitle ? <Text style={styles.subtitle}>{fixText(subtitle)}</Text> : null}
+        </View>
 
-      {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
+        {rightSlot ? <View style={styles.rightSlot}>{rightSlot}</View> : null}
+      </View>
     </View>
   );
 }
@@ -35,23 +36,33 @@ export function ScreenHeader({
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
     wrapper: {
-      marginBottom: theme.spacing.lg
+      marginBottom: theme.spacing.xl
+    },
+    row: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: theme.spacing.md
     },
     textBlock: {
-      marginBottom: theme.spacing.sm
+      flex: 1,
+      maxWidth: 860
     },
     title: {
       fontSize: theme.typography.screenTitle,
+      lineHeight: theme.typography.screenTitle + 6,
       fontWeight: "800",
       color: theme.colors.text,
-      marginBottom: theme.spacing.xs
+      marginBottom: theme.spacing.xs,
+      letterSpacing: -0.3
     },
     subtitle: {
       fontSize: theme.typography.body,
+      lineHeight: 24,
       color: theme.colors.textSecondary
     },
     rightSlot: {
-      marginTop: theme.spacing.sm
+      marginTop: theme.spacing.xs
     }
   });
 }

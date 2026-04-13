@@ -1,13 +1,12 @@
-import React from "react";
-
+﻿import React from "react";
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
   type ViewStyle
 } from "react-native";
-import { fixText } from "../../utils/fixText";
 
+import { fixText } from "../../utils/fixText";
 import type { AppTheme } from "../../theme";
 
 type ButtonVariant = "primary" | "secondary" | "ghost";
@@ -35,7 +34,7 @@ export function AppButton({
 
   return (
     <TouchableOpacity
-      activeOpacity={0.85}
+      activeOpacity={0.9}
       disabled={disabled}
       onPress={onPress}
       style={[styles.button, style]}
@@ -51,35 +50,33 @@ function createStyles(
   disabled: boolean,
   fullWidth: boolean
 ) {
-  const backgroundColor =
-    variant === "primary"
-      ? theme.colors.primary
-      : variant === "secondary"
-        ? theme.colors.surface
-        : "transparent";
-
-  const textColor =
-    variant === "primary" ? "#FFFFFF" : theme.colors.text;
+  const isPrimary = variant === "primary";
+  const isSecondary = variant === "secondary";
 
   return StyleSheet.create({
     button: {
       width: fullWidth ? "100%" : undefined,
-      minHeight: 52,
+      minHeight: 54,
       borderRadius: theme.radius.md,
       paddingHorizontal: theme.spacing.lg,
       paddingVertical: theme.spacing.md,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor,
+      backgroundColor: isPrimary
+        ? theme.colors.primary
+        : isSecondary
+          ? theme.colors.surfaceElevated
+          : "transparent",
       borderWidth: variant === "ghost" ? 0 : 1,
-      borderColor:
-        variant === "primary" ? theme.colors.primary : theme.colors.border,
-      opacity: disabled ? 0.6 : 1
+      borderColor: isPrimary ? theme.colors.primary : theme.colors.border,
+      opacity: disabled ? 0.55 : 1,
+      ...(isPrimary ? theme.shadow.md : theme.shadow.sm)
     },
     label: {
-      color: textColor,
+      color: isPrimary ? "#FFFFFF" : theme.colors.text,
       fontSize: theme.typography.body,
-      fontWeight: "700"
+      fontWeight: "800",
+      letterSpacing: 0.2
     }
   });
 }
