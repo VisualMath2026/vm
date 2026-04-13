@@ -267,7 +267,7 @@ function withQuestionDeleted(details: LectureDetails, questionId: string): Lectu
 }
 
 
-const DRAFT_LECTURES_STORAGE_KEY = "vm_mobile_draft_lectures_v900";
+const DRAFT_LECTURES_STORAGE_KEY = "vm_mobile_draft_lectures_v1000";
 
 type DraftStorageShape = {
   lectures: LectureItem[];
@@ -344,7 +344,7 @@ function pickDraftLectureDetails(
 }
 
 
-const WEB_DRAFTS_KEY_V4 = "vm_mobile_web_drafts_v900";
+const WEB_DRAFTS_KEY_V4 = "vm_mobile_web_drafts_v1000";
 
 type WebDraftStateV4 = {
   lectures: LectureItem[];

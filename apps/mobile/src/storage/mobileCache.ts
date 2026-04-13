@@ -3,13 +3,13 @@ import { createAsyncStorage } from "@react-native-async-storage/async-storage";
 import type { LectureItem } from "../mocks/lectures";
 import type { ThemeMode } from "../theme";
 
-const storage = createAsyncStorage("vmMobileCache");
+const storage = createAsyncStorage("vmMobileCache_v2");
 
 const STORAGE_KEYS = {
-  catalogSnapshot: "catalogSnapshot",
-  lastLectureId: "lastLectureId",
-  themeMode: "themeMode",
-  notificationsEnabled: "notificationsEnabled"
+  catalogSnapshot: "catalogSnapshot_v2",
+  lastLectureId: "lastLectureId_v2",
+  themeMode: "themeMode_v2",
+  notificationsEnabled: "notificationsEnabled_v2"
 } as const;
 
 async function readJson<T>(key: string): Promise<T | null> {
