@@ -10,6 +10,7 @@ export type LectureItem = {
   blocks: string[];
   participationRequirements: string[];
   estimatedDuration: string;
+  teacherLogin?: string;
 };
 
 export const mockLectures: LectureItem[] = [

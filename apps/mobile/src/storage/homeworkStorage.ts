@@ -9,6 +9,7 @@ export type HomeworkItem = {
   maxScore: number;
   createdBy: string;
   createdAt: string;
+  teacherLogin?: string;
 };
 
 export type HomeworkSubmissionItem = {
@@ -22,6 +23,7 @@ export type HomeworkSubmissionItem = {
   submittedAt: string;
   teacherComment: string;
   score: number | null;
+  teacherLogin?: string;
 };
 
 const storage = createAsyncStorage("vmHomework_v1");

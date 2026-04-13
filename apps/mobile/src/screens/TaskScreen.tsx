@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+﻿import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
 import { Screen } from "../components/ui/Screen";
@@ -8,6 +9,7 @@ import { SectionCard } from "../components/ui/SectionCard";
 import { StatusPill } from "../components/ui/StatusPill";
 import type { Question, SessionData, TaskSubmission } from "../mocks/session";
 import type { AppTheme } from "../theme";
+import { fixText } from "../utils/fixText";
 
 type TaskScreenProps = {
   theme: AppTheme;
@@ -68,14 +70,20 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
     return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }, [timeLeft]);
 
+  const answeredCount = useMemo(() => {
+    return session.questions.filter((question) => hasAnswer(question, answersByQuestionId)).length;
+  }, [answersByQuestionId, session.questions]);
+
+  const completionPercent = session.questions.length > 0
+    ? Math.round((answeredCount / session.questions.length) * 100)
+    : 0;
+
   if (!currentQuestion) {
     return (
       <Screen theme={theme}>
         <ScreenHeader theme={theme} title="Проверочный блок" subtitle="Нет доступных вопросов" />
         <SectionCard theme={theme} title="Пустой блок" subtitle="В этой сессии ещё нет заданий">
-          <View style={styles.actionGroup}>
-            <AppButton label="Назад" onPress={onBack} theme={theme} variant="secondary" />
-          </View>
+          <AppButton label="Назад" onPress={onBack} theme={theme} variant="secondary" />
         </SectionCard>
       </Screen>
     );
@@ -95,8 +103,11 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
     return "Короткий ответ";
   }
 
-  function hasAnswer(question: Question): boolean {
-    const answer = answersByQuestionId[question.id];
+  function hasAnswer(
+    question: Question,
+    answers: Record<string, DraftAnswer>
+  ): boolean {
+    const answer = answers[question.id];
 
     if (!answer) {
       return false;
@@ -176,7 +187,9 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
     }
 
     if (status === "submitted") {
-      const unansweredIndex = session.questions.findIndex((question) => !hasAnswer(question));
+      const unansweredIndex = session.questions.findIndex(
+        (question) => !hasAnswer(question, answersByQuestionId)
+      );
 
       if (unansweredIndex !== -1) {
         setCurrentIndex(unansweredIndex);
@@ -190,42 +203,95 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
     onSubmit(buildSubmission(status));
   }
 
-  const answeredCount = session.questions.filter((question) => hasAnswer(question)).length;
+  function goToQuestion(index: number) {
+    setCurrentIndex(index);
+    setErrorText("");
+  }
 
   return (
     <Screen theme={theme}>
       <ScreenHeader
         theme={theme}
         title="Проверочный блок"
-        subtitle={session.lectureTitle}
+        subtitle={fixText(session.lectureTitle)}
         rightSlot={
-          <View style={styles.metaRow}>
-            <StatusPill theme={theme} label={`Вопрос ${currentIndex + 1}/${session.questions.length}`} tone="info" />
-            <StatusPill theme={theme} label={`${answeredCount} заполнено`} tone="success" />
+          <View style={styles.headerPills}>
+            <StatusPill
+              theme={theme}
+              label={`Вопрос ${currentIndex + 1}/${session.questions.length}`}
+              tone="info"
+            />
+            <StatusPill
+              theme={theme}
+              label={`${answeredCount} заполнено`}
+              tone="success"
+            />
           </View>
         }
       />
 
+      <View style={styles.heroCard}>
+        <View style={styles.heroLeft}>
+          <Text style={styles.heroEyebrow}>Текущий прогресс</Text>
+          <Text style={styles.heroTitle}>{timerLabel}</Text>
+          <Text style={styles.heroSubtitle}>
+            {fixText("Можно свободно переключаться между вопросами до финальной отправки.")}
+          </Text>
+
+          <View style={styles.progressBarTrack}>
+            <View
+              style={[
+                styles.progressBarFill,
+                { width: `${completionPercent}%`, backgroundColor: theme.colors.primary }
+              ]}
+            />
+          </View>
+
+          <Text style={styles.progressCaption}>
+            {fixText(`Заполнено ${answeredCount} из ${session.questions.length} вопросов (${completionPercent}%).`)}
+          </Text>
+
+          <View style={styles.heroActions}>
+            <AppButton
+              label="Вернуться к сессии"
+              onPress={onBack}
+              theme={theme}
+              variant="secondary"
+              fullWidth={false}
+              style={styles.heroButton}
+            />
+            <AppButton
+              label={`Отправить ответы (${answeredCount}/${session.questions.length})`}
+              onPress={() => handleSubmit("submitted")}
+              theme={theme}
+              fullWidth={false}
+              disabled={isLocked}
+              style={styles.heroButton}
+            />
+          </View>
+        </View>
+
+        <View style={styles.heroStats}>
+          <MiniStatCard theme={theme} value={String(session.questions.length)} label="Всего вопросов" />
+          <MiniStatCard theme={theme} value={String(answeredCount)} label="Заполнено" />
+          <MiniStatCard theme={theme} value={questionTypeLabel(currentQuestion)} label="Тип текущего" />
+        </View>
+      </View>
+
       <SectionCard
         theme={theme}
-        title="Таймер и прогресс"
-        subtitle="Можно переходить между вопросами до финальной отправки"
+        title="Навигация по вопросам"
+        subtitle="Нажми на номер, чтобы быстро перейти к нужному вопросу."
       >
-        <Text style={styles.timer}>{timerLabel}</Text>
-        <Text style={styles.metaText}>Если время закончится, ответы отправятся автоматически.</Text>
-
         <View style={styles.progressRow}>
           {session.questions.map((question, index) => {
             const isCurrent = index === currentIndex;
-            const isAnswered = hasAnswer(question);
+            const isAnswered = hasAnswer(question, answersByQuestionId);
 
             return (
               <Pressable
                 key={question.id}
-                onPress={() => {
-                  setCurrentIndex(index);
-                  setErrorText("");
-                }}
+                onPress={() => goToQuestion(index)}
                 style={[
                   styles.progressChip,
                   {
@@ -253,7 +319,9 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
         title={`Вопрос ${currentIndex + 1}`}
         subtitle={questionTypeLabel(currentQuestion)}
       >
-        <Text style={styles.questionText}>{currentQuestion.prompt}</Text>
+        <View style={styles.questionHero}>
+          <Text style={styles.questionPrompt}>{fixText(currentQuestion.prompt)}</Text>
+        </View>
 
         {currentQuestion.type === "single-choice"
           ? currentQuestion.options?.map((option) => {
@@ -264,14 +332,25 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
                   key={option.id}
                   onPress={() => handleSelectSingleOption(option.id)}
                   style={[
-                    styles.optionButton,
+                    styles.optionCard,
                     {
                       borderColor: isSelected ? theme.colors.primary : theme.colors.border,
                       backgroundColor: isSelected ? theme.colors.surfaceMuted : theme.colors.surface
                     }
                   ]}
                 >
-                  <Text style={styles.optionText}>{option.label}</Text>
+                  <View style={styles.optionTopRow}>
+                    <View
+                      style={[
+                        styles.optionMarker,
+                        {
+                          borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                          backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface
+                        }
+                      ]}
+                    />
+                    <Text style={styles.optionText}>{fixText(option.label)}</Text>
+                  </View>
                 </Pressable>
               );
             })
@@ -290,14 +369,25 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
                   key={option.id}
                   onPress={() => handleToggleMultipleOption(option.id)}
                   style={[
-                    styles.optionButton,
+                    styles.optionCard,
                     {
                       borderColor: isSelected ? theme.colors.primary : theme.colors.border,
                       backgroundColor: isSelected ? theme.colors.surfaceMuted : theme.colors.surface
                     }
                   ]}
                 >
-                  <Text style={styles.optionText}>{option.label}</Text>
+                  <View style={styles.optionTopRow}>
+                    <View
+                      style={[
+                        styles.optionSquare,
+                        {
+                          borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                          backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface
+                        }
+                      ]}
+                    />
+                    <Text style={styles.optionText}>{fixText(option.label)}</Text>
+                  </View>
                 </Pressable>
               );
             })}
@@ -305,19 +395,21 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
         ) : null}
 
         {currentQuestion.type === "short-answer" ? (
-          <AppInput
-            label="Ответ"
-            value={currentDraft.shortAnswer ?? ""}
-            onChangeText={handleShortAnswer}
-            placeholder="Введите ответ"
-            keyboardType="numeric"
-            theme={theme}
-          />
+          <View style={styles.shortAnswerWrap}>
+            <AppInput
+              label="Ответ"
+              value={currentDraft.shortAnswer ?? ""}
+              onChangeText={handleShortAnswer}
+              placeholder="Введите ответ"
+              keyboardType="numeric"
+              theme={theme}
+            />
+          </View>
         ) : null}
 
-        {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
+        {errorText ? <Text style={styles.errorText}>{fixText(errorText)}</Text> : null}
 
-        <View style={styles.navRow}>
+        <View style={styles.bottomNavRow}>
           <Pressable
             onPress={() => setCurrentIndex((current) => Math.max(0, current - 1))}
             disabled={currentIndex === 0}
@@ -334,7 +426,9 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
           </Pressable>
 
           <Pressable
-            onPress={() => setCurrentIndex((current) => Math.min(session.questions.length - 1, current + 1))}
+            onPress={() =>
+              setCurrentIndex((current) => Math.min(session.questions.length - 1, current + 1))
+            }
             disabled={currentIndex === session.questions.length - 1}
             style={[
               styles.navButton,
@@ -348,97 +442,130 @@ export function TaskScreen({ theme, session, onBack, onSubmit }: TaskScreenProps
             <Text style={styles.navButtonText}>Далее</Text>
           </Pressable>
         </View>
-
-        <View style={styles.actionGroup}>
-          <AppButton
-            label={`Отправить ответы (${answeredCount}/${session.questions.length})`}
-            onPress={() => handleSubmit("submitted")}
-            theme={theme}
-            disabled={isLocked}
-          />
-        </View>
       </SectionCard>
     </Screen>
   );
 }
 
+type MiniStatCardProps = {
+  theme: AppTheme;
+  value: string;
+  label: string;
+};
+
+function MiniStatCard({ theme, value, label }: MiniStatCardProps) {
+  const styles = createStyles(theme);
+
+  return (
+    <View style={styles.miniStatCard}>
+      <Text numberOfLines={2} style={styles.miniStatValue}>{fixText(value)}</Text>
+      <Text style={styles.miniStatLabel}>{fixText(label)}</Text>
+    </View>
+  );
+}
+
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
-    timer: {
-      fontSize: theme.typography.title,
-      fontWeight: "800",
-      color: theme.colors.primary,
-      textAlign: "center",
-      marginBottom: theme.spacing.sm
+    headerPills: {
+      flexDirection: "row",
+      flexWrap: "wrap"
     },
-    metaText: {
-      fontSize: theme.typography.body,
-      color: theme.colors.textSecondary,
-      textAlign: "center"
-    },
-    helperText: {
-      fontSize: theme.typography.caption,
-      color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.sm
-    },
-    questionText: {
-      fontSize: theme.typography.body,
-      color: theme.colors.text,
-      marginBottom: theme.spacing.md
-    },
-    optionButton: {
-      borderWidth: 1,
-      borderRadius: theme.radius.md,
-      paddingVertical: theme.spacing.md,
-      paddingHorizontal: theme.spacing.md,
-      marginBottom: theme.spacing.sm
-    },
-    optionText: {
-      fontSize: theme.typography.body,
-      fontWeight: "600",
-      color: theme.colors.text
-    },
-    errorText: {
-      color: theme.colors.danger,
-      fontSize: theme.typography.caption,
-      marginTop: theme.spacing.xs
-    },
-    actionGroup: {
-      marginTop: theme.spacing.md
-    },
-    metaRow: {
+    heroCard: {
       flexDirection: "row",
       flexWrap: "wrap",
+      borderRadius: theme.radius.xl,
+      padding: theme.spacing.xl,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: theme.spacing.lg,
+      ...theme.shadow.lg
+    },
+    heroLeft: {
+      flex: 1,
+      minWidth: 320,
+      paddingRight: theme.spacing.lg
+    },
+    heroEyebrow: {
+      fontSize: theme.typography.caption,
+      fontWeight: "800",
+      color: theme.colors.primary,
+      marginBottom: theme.spacing.sm,
+      textTransform: "uppercase",
+      letterSpacing: 0.4
+    },
+    heroTitle: {
+      fontSize: theme.typography.title,
+      fontWeight: "900",
+      color: theme.colors.primary,
       marginBottom: theme.spacing.sm
     },
-    navRow: {
-      flexDirection: "row",
-      gap: theme.spacing.sm,
-      marginTop: theme.spacing.md
-    },
-    navButton: {
-      flex: 1,
-      minHeight: 48,
-      borderWidth: 1,
-      borderRadius: theme.radius.md,
-      alignItems: "center",
-      justifyContent: "center",
-      paddingHorizontal: theme.spacing.md
-    },
-    navButtonText: {
+    heroSubtitle: {
       fontSize: theme.typography.body,
+      lineHeight: 24,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.md,
+      maxWidth: 760
+    },
+    progressBarTrack: {
+      height: 12,
+      borderRadius: 999,
+      backgroundColor: theme.colors.surfaceMuted,
+      overflow: "hidden",
+      marginBottom: theme.spacing.sm,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    progressBarFill: {
+      height: "100%",
+      borderRadius: 999
+    },
+    progressCaption: {
+      fontSize: theme.typography.caption,
       fontWeight: "700",
-      color: theme.colors.text
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.md
+    },
+    heroActions: {
+      flexDirection: "row",
+      flexWrap: "wrap"
+    },
+    heroButton: {
+      marginRight: theme.spacing.sm,
+      marginBottom: theme.spacing.sm
+    },
+    heroStats: {
+      width: 260,
+      minWidth: 220,
+      justifyContent: "space-between"
+    },
+    miniStatCard: {
+      borderRadius: theme.radius.lg,
+      padding: theme.spacing.lg,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: theme.spacing.sm
+    },
+    miniStatValue: {
+      fontSize: 22,
+      fontWeight: "900",
+      color: theme.colors.text,
+      marginBottom: theme.spacing.xs
+    },
+    miniStatLabel: {
+      fontSize: theme.typography.caption,
+      fontWeight: "700",
+      color: theme.colors.textSecondary
     },
     progressRow: {
       flexDirection: "row",
       flexWrap: "wrap",
-      justifyContent: "center",
-      marginTop: theme.spacing.md
+      justifyContent: "center"
     },
     progressChip: {
-      minWidth: 40,
-      height: 40,
+      minWidth: 44,
+      height: 44,
       borderWidth: 1,
       borderRadius: 999,
       alignItems: "center",
@@ -448,9 +575,87 @@ function createStyles(theme: AppTheme) {
     },
     progressChipText: {
       fontSize: theme.typography.body,
-      fontWeight: "700"
+      fontWeight: "800"
+    },
+    questionHero: {
+      borderRadius: theme.radius.lg,
+      padding: theme.spacing.lg,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: theme.spacing.md
+    },
+    questionPrompt: {
+      fontSize: theme.typography.sectionTitle,
+      lineHeight: 28,
+      fontWeight: "900",
+      color: theme.colors.text
+    },
+    helperText: {
+      fontSize: theme.typography.caption,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.sm
+    },
+    optionCard: {
+      borderWidth: 1,
+      borderRadius: theme.radius.lg,
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.md,
+      marginBottom: theme.spacing.sm,
+      ...theme.shadow.sm
+    },
+    optionTopRow: {
+      flexDirection: "row",
+      alignItems: "center"
+    },
+    optionMarker: {
+      width: 20,
+      height: 20,
+      borderRadius: 999,
+      borderWidth: 2,
+      marginRight: theme.spacing.md
+    },
+    optionSquare: {
+      width: 20,
+      height: 20,
+      borderRadius: 6,
+      borderWidth: 2,
+      marginRight: theme.spacing.md
+    },
+    optionText: {
+      flex: 1,
+      fontSize: theme.typography.body,
+      fontWeight: "700",
+      color: theme.colors.text,
+      lineHeight: 22
+    },
+    shortAnswerWrap: {
+      marginTop: theme.spacing.xs
+    },
+    errorText: {
+      color: theme.colors.danger,
+      fontSize: theme.typography.caption,
+      fontWeight: "700",
+      marginTop: theme.spacing.xs
+    },
+    bottomNavRow: {
+      flexDirection: "row",
+      marginTop: theme.spacing.md
+    },
+    navButton: {
+      flex: 1,
+      minHeight: 50,
+      borderWidth: 1,
+      borderRadius: theme.radius.md,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: theme.spacing.md,
+      marginRight: theme.spacing.sm
+    },
+    navButtonText: {
+      fontSize: theme.typography.body,
+      fontWeight: "800",
+      color: theme.colors.text
     }
   });
 }
-
-

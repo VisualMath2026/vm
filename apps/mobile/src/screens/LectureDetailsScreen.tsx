@@ -1,12 +1,19 @@
-import React from "react";
+﻿import React from "react";
 import {
+  Linking,
+  Pressable,
   StyleSheet,
   Text,
-  View,
-  Linking,
-  Pressable
+  View
 } from "react-native";
-import type { LectureDetails, LectureBlock, QuizBlock, TextBlock, VisualBlock } from "@vm/shared";
+import type {
+  LectureBlock,
+  LectureDetails,
+  QuizBlock,
+  TextBlock,
+  VisualBlock
+} from "@vm/shared";
+
 import { AppButton } from "../components/ui/AppButton";
 import { Screen } from "../components/ui/Screen";
 import { ScreenHeader } from "../components/ui/ScreenHeader";
@@ -35,118 +42,255 @@ export function LectureDetailsScreen({
   const styles = createStyles(theme);
   const videoUrl = String((lecture as { videoUrl?: string }).videoUrl ?? "").trim();
   const blocks = lectureDetails?.blocks ?? [];
+  const requirements = fixTextList(
+    lecture.id.startsWith("draft-lecture-")
+      ? ["Открой лекцию и перейди к занятию.", "После этого можно пройти проверочный блок."]
+      : lecture.participationRequirements
+  );
 
   return (
     <Screen theme={theme}>
       <ScreenHeader
         theme={theme}
-        title={lecture.title}
-        subtitle={lecture.subject}
+        title={fixText(lecture.title)}
+        subtitle={fixText(lecture.subject)}
         rightSlot={
-          <View style={styles.metaRow}>
-            <StatusPill theme={theme} label={lecture.level} tone="info" />
-            <StatusPill theme={theme} label={fixText((lecture.id.startsWith("draft-lecture-") ? "15 минут" : lecture.estimatedDuration))} tone="neutral" />
+          <View style={styles.headerPills}>
+            <StatusPill theme={theme} label={fixText(lecture.level)} tone="info" />
+            <StatusPill
+              theme={theme}
+              label={fixText(lecture.id.startsWith("draft-lecture-") ? "15 минут" : lecture.estimatedDuration)}
+              tone="neutral"
+            />
           </View>
         }
       />
 
+      <View style={styles.heroCard}>
+        <View style={styles.heroLeft}>
+          <Text style={styles.heroEyebrow}>Карточка лекции</Text>
+          <Text style={styles.heroTitle}>{fixText(lecture.title)}</Text>
+          <Text style={styles.heroSubtitle}>{fixText(lecture.description)}</Text>
+
+          <View style={styles.tagRow}>
+            <View style={styles.infoBadge}>
+              <Text style={styles.infoBadgeText}>{fixText(lecture.subject)}</Text>
+            </View>
+            <View style={styles.infoBadge}>
+              <Text style={styles.infoBadgeText}>{fixText(lecture.semester)}</Text>
+            </View>
+            <View style={styles.infoBadge}>
+              <Text style={styles.infoBadgeText}>{fixText(lecture.level)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.heroActions}>
+            <AppButton
+              label="Открыть занятие"
+              onPress={onOpenSession}
+              theme={theme}
+              fullWidth={false}
+              style={styles.heroButton}
+            />
+            <AppButton
+              label="Назад"
+              onPress={onBack}
+              theme={theme}
+              variant="secondary"
+              fullWidth={false}
+              style={styles.heroButton}
+            />
+          </View>
+        </View>
+
+        <View style={styles.heroStats}>
+          <MiniStatCard
+            theme={theme}
+            value={String(blocks.length > 0 ? blocks.length : lecture.blocks.length)}
+            label="Блоков"
+          />
+          <MiniStatCard
+            theme={theme}
+            value={String(lecture.tags.length)}
+            label="Тегов"
+          />
+          <MiniStatCard
+            theme={theme}
+            value={fixText(lecture.id.startsWith("draft-lecture-") ? "Черновик" : lecture.author)}
+            label="Автор"
+          />
+        </View>
+      </View>
+
+      <View style={styles.grid}>
+        <SectionCard
+          theme={theme}
+          title="Основная информация"
+          subtitle="Краткая сводка перед началом занятия."
+          style={styles.cardWide}
+        >
+          <View style={styles.infoGrid}>
+            <InfoTile theme={theme} label="Автор" value={lecture.id.startsWith("draft-lecture-") ? "Visual Math Team" : lecture.author} />
+            <InfoTile theme={theme} label="Семестр" value={lecture.semester} />
+            <InfoTile theme={theme} label="Предмет" value={lecture.subject} />
+            <InfoTile theme={theme} label="Длительность" value={lecture.id.startsWith("draft-lecture-") ? "15 минут" : lecture.estimatedDuration} />
+          </View>
+
+          <Text style={styles.sectionText}>
+            {fixText("Теги")}: {fixText(lecture.tags.join(", "))}
+          </Text>
+        </SectionCard>
+
+        <SectionCard
+          theme={theme}
+          title="Требования и подготовка"
+          subtitle="Что желательно знать перед открытием занятия."
+          style={styles.cardNarrow}
+        >
+          {requirements.map((item, index) => (
+            <Text key={`${item}-${index}`} style={styles.listItem}>
+              • {fixText(item)}
+            </Text>
+          ))}
+        </SectionCard>
+      </View>
+
       {videoUrl ? (
         <SectionCard
-          title="\u0412\u0438\u0434\u0435\u043e\u043c\u0430\u0442\u0435\u0440\u0438\u0430\u043b"
-          subtitle="\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0441\u0441\u044b\u043b\u043a\u0443 \u0438 \u0441\u043c\u043e\u0442\u0440\u0438\u0442\u0435 \u0432\u0438\u0434\u0435\u043e"
+          title="Видеоматериал"
+          subtitle="Дополнительный видеоурок или запись по теме."
           theme={theme}
         >
-          <Pressable
-            onPress={() => void Linking.openURL(videoUrl)}
-            style={{
-              paddingVertical: theme.spacing.xs
-            }}
-          >
-            <Text
-              style={{
-                color: theme.colors.primary,
-                fontSize: theme.typography.body,
-                fontWeight: "700"
-              }}
-            >
-              \u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0432\u0438\u0434\u0435\u043e
-            </Text>
-            <Text
-              style={{
-                color: theme.colors.textSecondary,
-                fontSize: theme.typography.caption,
-                marginTop: theme.spacing.xs
-              }}
-            >
-              {videoUrl}
-            </Text>
+          <Pressable onPress={() => void Linking.openURL(videoUrl)} style={styles.videoCard}>
+            <Text style={styles.videoTitle}>Открыть видео</Text>
+            <Text style={styles.videoSubtitle}>{videoUrl}</Text>
           </Pressable>
         </SectionCard>
       ) : null}
 
       <SectionCard
         theme={theme}
-        title="О лекции"
-        subtitle="Краткая информация перед входом в занятие"
-      >
-        <Text style={styles.bodyText}>{fixText(lecture.description)}</Text>
-        <Text style={styles.bodyText}>Автор: {lecture.id.startsWith("draft-lecture-") ? "Visual Math Team" : lecture.author}</Text>
-        <Text style={styles.bodyText}>Семестр: {lecture.semester}</Text>
-        <Text style={styles.bodyText}>Теги: {lecture.tags.join(", ")}</Text>
-
-        <View style={styles.topSpacing}>
-          {fixTextList((lecture.id.startsWith("draft-lecture-") ? ["Visual Math Team"] : lecture.participationRequirements)).map((item, index) => (
-            <Text key={`${item}-${index}`} style={styles.listItem}>
-              • {item}
-            </Text>
-          ))}
-        </View>
-      </SectionCard>
-
-      <SectionCard
-        theme={theme}
         title="Структура лекции"
-        subtitle="Список блоков и их preview"
+        subtitle="Блоки, которые входят в это занятие."
       >
         {blocks.length > 0 ? (
-          <>
+          <View style={styles.blockList}>
             {blocks.map((block, index) => (
-              <View key={`${block.type}-${index}`} style={styles.topSpacing}>
-                <Text style={styles.bodyText}>
-                  {index + 1}. {block.title || blockLabel(block)}
-                </Text>
-              </View>
-            ))}
+              <View key={`${block.type}-${index}`} style={styles.blockSummaryCard}>
+                <View style={styles.blockSummaryTop}>
+                  <Text style={styles.blockIndex}>Блок {index + 1}</Text>
+                  <View style={styles.blockTypeBadge}>
+                    <Text style={styles.blockTypeBadgeText}>{fixText(blockLabel(block))}</Text>
+                  </View>
+                </View>
 
-            {blocks.map((block, index) => (
-              <View key={`preview-${block.type}-${index}`} style={styles.topSpacing}>
-                <BlockPreview theme={theme} block={block} index={index} />
+                <Text style={styles.blockTitle}>{fixText(block.title || blockLabel(block))}</Text>
+                <BlockSummary theme={theme} block={block} />
               </View>
             ))}
-          </>
+          </View>
         ) : (
-          <>
-            {fixTextList((lecture.id.startsWith("draft-lecture-") ? ["Theory", "Questions"] : lecture.blocks)).map((block, index) => (
-              <Text key={`${block}-${index}`} style={styles.listItem}>
-                {index + 1}. {block}
-              </Text>
+          <View style={styles.blockList}>
+            {fixTextList(lecture.id.startsWith("draft-lecture-") ? ["Theory", "Questions"] : lecture.blocks).map((block, index) => (
+              <View key={`${block}-${index}`} style={styles.blockSummaryCard}>
+                <View style={styles.blockSummaryTop}>
+                  <Text style={styles.blockIndex}>Блок {index + 1}</Text>
+                </View>
+                <Text style={styles.blockTitle}>{fixText(block)}</Text>
+                <Text style={styles.blockSummaryText}>Блок будет детализирован после загрузки данных лекции.</Text>
+              </View>
             ))}
-          </>
+          </View>
         )}
-
-        <View style={styles.actionTop}>
-          <AppButton label="Открыть занятие" onPress={onOpenSession} theme={theme} />
-        </View>
-
-        <View style={styles.actionTop}>
-          <AppButton label="Назад" onPress={onBack} theme={theme} variant="secondary" />
-        </View>
-
-        <Text style={styles.noteText}>
-          Можно перейти к сессии, просмотреть активный блок и пройти все задания лекции.
-        </Text>
       </SectionCard>
+
+      {blocks.length > 0 ? (
+        <SectionCard
+          theme={theme}
+          title="Preview содержимого"
+          subtitle="Краткий просмотр наполнения лекции."
+        >
+          {blocks.map((block, index) => (
+            <View key={`preview-${block.type}-${index}`} style={styles.previewSpacing}>
+              <BlockPreview theme={theme} block={block} index={index} />
+            </View>
+          ))}
+        </SectionCard>
+      ) : null}
     </Screen>
+  );
+}
+
+type MiniStatCardProps = {
+  theme: AppTheme;
+  value: string;
+  label: string;
+};
+
+function MiniStatCard({ theme, value, label }: MiniStatCardProps) {
+  const styles = createStyles(theme);
+
+  return (
+    <View style={styles.miniStatCard}>
+      <Text numberOfLines={2} style={styles.miniStatValue}>{fixText(value)}</Text>
+      <Text style={styles.miniStatLabel}>{fixText(label)}</Text>
+    </View>
+  );
+}
+
+type InfoTileProps = {
+  theme: AppTheme;
+  label: string;
+  value: string;
+};
+
+function InfoTile({ theme, label, value }: InfoTileProps) {
+  const styles = createStyles(theme);
+
+  return (
+    <View style={styles.infoTile}>
+      <Text style={styles.infoTileLabel}>{fixText(label)}</Text>
+      <Text style={styles.infoTileValue}>{fixText(value)}</Text>
+    </View>
+  );
+}
+
+type BlockSummaryProps = {
+  theme: AppTheme;
+  block: LectureBlock;
+};
+
+function BlockSummary({ theme, block }: BlockSummaryProps) {
+  const styles = createStyles(theme);
+
+  if (block.type === "text") {
+    const textBlock = block as TextBlock;
+    const lines = textBlock.payload.markdown
+      .split("\n")
+      .map((line) => line.replace(/^#+\s*/, "").trim())
+      .filter(Boolean);
+
+    return (
+      <Text numberOfLines={3} style={styles.blockSummaryText}>
+        {fixText(lines.slice(0, 3).join(" "))}
+      </Text>
+    );
+  }
+
+  if (block.type === "visual") {
+    const visualBlock = block as VisualBlock;
+    return (
+      <Text numberOfLines={3} style={styles.blockSummaryText}>
+        {fixText(visualBlock.payload.caption || "Интерактивный визуальный модуль для этой лекции.")}
+      </Text>
+    );
+  }
+
+  const quizBlock = block as QuizBlock;
+  return (
+    <Text style={styles.blockSummaryText}>
+      {fixText(`Вопросов: ${quizBlock.payload.questions.length}. Ограничение: ${quizBlock.payload.timeLimitSec ?? 0} сек.`)}
+    </Text>
   );
 }
 
@@ -170,11 +314,11 @@ function BlockPreview({ theme, block, index }: BlockPreviewProps) {
       <SectionCard
         theme={theme}
         title={`Блок ${index + 1}: текст`}
-        subtitle={block.title || "Текстовый материал лекции"}
+        subtitle={fixText(block.title || "Текстовый материал лекции")}
       >
         {lines.slice(0, 5).map((line, lineIndex) => (
-          <Text key={`${line}-${lineIndex}`} style={line.startsWith("-") ? styles.listItem : styles.textLine}>
-            {line.startsWith("-") ? `• ${line.replace(/^-+\s*/, "")}` : line}
+          <Text key={`${line}-${lineIndex}`} style={line.startsWith("-") ? styles.listItem : styles.previewTextLine}>
+            {line.startsWith("-") ? `• ${fixText(line.replace(/^-+\s*/, ""))}` : fixText(line)}
           </Text>
         ))}
       </SectionCard>
@@ -194,14 +338,14 @@ function BlockPreview({ theme, block, index }: BlockPreviewProps) {
       <SectionCard
         theme={theme}
         title={`Блок ${index + 1}: визуализация`}
-        subtitle={visualBlock.payload.caption || "Интерактивная визуализация для этой лекции"}
+        subtitle={fixText(visualBlock.payload.caption || "Интерактивная визуализация")}
       >
-        <Text style={styles.bodyText}>Сцена: {sceneName}</Text>
+        <Text style={styles.sectionText}>{fixText(`Сцена: ${sceneName}`)}</Text>
         <VisualModuleFallback
           theme={theme}
           compact
           title="Preview визуального модуля"
-          description="Пока здесь безопасный UI-fallback. Позже этот контейнер можно будет заменить на реальный рендер VM Graphics."
+          description="Пока здесь безопасный UI-fallback. Позже этот контейнер можно заменить на реальный рендер VM Graphics."
         />
       </SectionCard>
     );
@@ -215,13 +359,13 @@ function BlockPreview({ theme, block, index }: BlockPreviewProps) {
       title={`Блок ${index + 1}: проверка`}
       subtitle="Проверочный блок лекции"
     >
-      <Text style={styles.bodyText}>
-        Ограничение по времени: {quizBlock.payload.timeLimitSec ?? 0} сек.
+      <Text style={styles.sectionText}>
+        {fixText(`Ограничение по времени: ${quizBlock.payload.timeLimitSec ?? 0} сек.`)}
       </Text>
 
       {quizBlock.payload.questions.map((question, questionIndex) => (
         <Text key={`${question.text}-${questionIndex}`} style={styles.listItem}>
-          {questionIndex + 1}. {question.text}
+          {questionIndex + 1}. {fixText(question.text)}
         </Text>
       ))}
     </SectionCard>
@@ -230,28 +374,160 @@ function BlockPreview({ theme, block, index }: BlockPreviewProps) {
 
 function blockLabel(block: LectureBlock): string {
   if (block.type === "text") {
-    return "Текстовый блок";
+    return "Текст";
   }
 
   if (block.type === "visual") {
-    return "Визуальный блок";
+    return "Визуализация";
   }
 
-  return "Проверочный блок";
+  return "Проверка";
 }
 
 function createStyles(theme: AppTheme) {
   return StyleSheet.create({
-    bodyText: {
-      fontSize: theme.typography.body,
+    headerPills: {
+      flexDirection: "row",
+      flexWrap: "wrap"
+    },
+    heroCard: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      borderRadius: theme.radius.xl,
+      padding: theme.spacing.xl,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: theme.spacing.lg,
+      ...theme.shadow.lg
+    },
+    heroLeft: {
+      flex: 1,
+      minWidth: 320,
+      paddingRight: theme.spacing.lg
+    },
+    heroEyebrow: {
+      fontSize: theme.typography.caption,
+      fontWeight: "800",
+      color: theme.colors.primary,
+      marginBottom: theme.spacing.sm,
+      textTransform: "uppercase",
+      letterSpacing: 0.4
+    },
+    heroTitle: {
+      fontSize: theme.typography.title,
+      lineHeight: theme.typography.title + 6,
+      fontWeight: "900",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
-    textLine: {
+    heroSubtitle: {
+      fontSize: theme.typography.body,
+      lineHeight: 26,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.lg,
+      maxWidth: 760
+    },
+    tagRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginBottom: theme.spacing.md
+    },
+    infoBadge: {
+      minHeight: 34,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.radius.pill,
+      justifyContent: "center",
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginRight: theme.spacing.sm,
+      marginBottom: theme.spacing.sm
+    },
+    infoBadgeText: {
+      fontSize: theme.typography.caption,
+      fontWeight: "800",
+      color: theme.colors.text
+    },
+    heroActions: {
+      flexDirection: "row",
+      flexWrap: "wrap"
+    },
+    heroButton: {
+      marginRight: theme.spacing.sm,
+      marginBottom: theme.spacing.sm
+    },
+    heroStats: {
+      width: 260,
+      minWidth: 220,
+      justifyContent: "space-between"
+    },
+    miniStatCard: {
+      borderRadius: theme.radius.lg,
+      padding: theme.spacing.lg,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: theme.spacing.sm
+    },
+    miniStatValue: {
+      fontSize: 22,
+      fontWeight: "900",
+      color: theme.colors.text,
+      marginBottom: theme.spacing.xs
+    },
+    miniStatLabel: {
+      fontSize: theme.typography.caption,
+      fontWeight: "700",
+      color: theme.colors.textSecondary
+    },
+    grid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginHorizontal: -theme.spacing.xs
+    },
+    cardWide: {
+      flexBasis: 720,
+      flexGrow: 1,
+      marginHorizontal: theme.spacing.xs
+    },
+    cardNarrow: {
+      flexBasis: 320,
+      flexGrow: 1,
+      marginHorizontal: theme.spacing.xs
+    },
+    infoGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginHorizontal: -theme.spacing.xs
+    },
+    infoTile: {
+      flexBasis: 220,
+      flexGrow: 1,
+      marginHorizontal: theme.spacing.xs,
+      marginBottom: theme.spacing.sm,
+      padding: theme.spacing.md,
+      borderRadius: theme.radius.md,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    infoTileLabel: {
+      fontSize: theme.typography.helper,
+      fontWeight: "700",
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.xs
+    },
+    infoTileValue: {
+      fontSize: theme.typography.body,
+      fontWeight: "800",
+      color: theme.colors.text
+    },
+    sectionText: {
       fontSize: theme.typography.body,
       color: theme.colors.text,
       marginBottom: theme.spacing.sm,
-      lineHeight: 22
+      lineHeight: 24
     },
     listItem: {
       fontSize: theme.typography.body,
@@ -259,21 +535,88 @@ function createStyles(theme: AppTheme) {
       marginBottom: theme.spacing.sm,
       lineHeight: 22
     },
-    noteText: {
+    videoCard: {
+      borderRadius: theme.radius.lg,
+      padding: theme.spacing.lg,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    videoTitle: {
+      fontSize: theme.typography.sectionTitle,
+      fontWeight: "900",
+      color: theme.colors.primary,
+      marginBottom: theme.spacing.xs
+    },
+    videoSubtitle: {
       fontSize: theme.typography.caption,
-      color: theme.colors.textSecondary,
-      marginTop: theme.spacing.sm
+      lineHeight: 20,
+      color: theme.colors.textSecondary
     },
-    actionTop: {
-      marginTop: theme.spacing.md
-    },
-    topSpacing: {
-      marginTop: theme.spacing.sm
-    },
-    metaRow: {
+    blockList: {
       flexDirection: "row",
       flexWrap: "wrap",
+      marginHorizontal: -theme.spacing.xs
+    },
+    blockSummaryCard: {
+      flexBasis: 300,
+      flexGrow: 1,
+      marginHorizontal: theme.spacing.xs,
+      marginBottom: theme.spacing.md,
+      padding: theme.spacing.lg,
+      borderRadius: theme.radius.lg,
+      backgroundColor: theme.colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      ...theme.shadow.sm
+    },
+    blockSummaryTop: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
       marginBottom: theme.spacing.sm
+    },
+    blockIndex: {
+      fontSize: theme.typography.caption,
+      fontWeight: "800",
+      color: theme.colors.primary,
+      marginBottom: theme.spacing.xs
+    },
+    blockTypeBadge: {
+      minHeight: 28,
+      paddingHorizontal: theme.spacing.sm,
+      borderRadius: theme.radius.pill,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      justifyContent: "center",
+      marginBottom: theme.spacing.xs
+    },
+    blockTypeBadgeText: {
+      fontSize: theme.typography.helper,
+      fontWeight: "800",
+      color: theme.colors.textSecondary
+    },
+    blockTitle: {
+      fontSize: theme.typography.sectionTitle,
+      fontWeight: "900",
+      color: theme.colors.text,
+      marginBottom: theme.spacing.sm
+    },
+    blockSummaryText: {
+      fontSize: theme.typography.body,
+      lineHeight: 22,
+      color: theme.colors.textSecondary
+    },
+    previewSpacing: {
+      marginTop: theme.spacing.sm
+    },
+    previewTextLine: {
+      fontSize: theme.typography.body,
+      color: theme.colors.text,
+      marginBottom: theme.spacing.sm,
+      lineHeight: 22
     }
   });
 }

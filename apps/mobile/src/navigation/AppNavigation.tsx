@@ -22,6 +22,7 @@ import { PhotoMaterialsScreen, type PhotoMaterialItem } from "../screens/PhotoMa
 import { MeetingsScreen, type MeetingDraftInput } from "../screens/MeetingsScreen";
 import { HomeworkScreen, type HomeworkDraftInput, type HomeworkSubmissionDraftInput } from "../screens/HomeworkScreen";
 import { GradesScreen } from "../screens/GradesScreen";
+import { TeacherBranchSelectScreen } from "../screens/TeacherBranchSelectScreen";
 import { LatexWorkspaceScreen } from "../screens/LatexWorkspaceScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
@@ -53,6 +54,13 @@ import {
   type HomeworkItem,
   type HomeworkSubmissionItem
 } from "../storage/homeworkStorage";
+import {
+  readTeacherBranches,
+  readSelectedTeacherLogin,
+  writeTeacherBranches,
+  writeSelectedTeacherLogin,
+  type TeacherBranch
+} from "../storage/teacherBranchesStorage";
 import { fixText } from "../utils/fixText";
 import { authApi, catalogApi, quizApi, sessionApi, toUserMessage } from "../api/mobileApi";
 import {
@@ -78,6 +86,7 @@ type ScreenKey =
   | "meetings"
   | "homework"
   | "grades"
+  | "teacherBranchSelect"
   | "latex"
   | "profile";
 
@@ -112,16 +121,17 @@ function upsertLecture(lectures: LectureItem[], lecture: LectureItem): LectureIt
   return next;
 }
 
-
 function createDraftLectureItem(
   lectureId: string,
   input: DraftLectureInput,
-  authorName: string
+  authorName: string,
+  teacherLogin: string
 ): LectureItem {
   const lecture: LectureItem = {
     id: lectureId,
     title: input.title.trim() || "\u041d\u043e\u0432\u0430\u044f \u043b\u0435\u043a\u0446\u0438\u044f",
     author: authorName || "Visual Math Team",
+    teacherLogin,
     subject: input.subject.trim() || "\u041c\u0430\u0442\u0435\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0439 \u0430\u043d\u0430\u043b\u0438\u0437",
     semester: input.semester.trim() || "1 \u0441\u0435\u043c\u0435\u0441\u0442\u0440",
     level: input.level.trim() || "\u0411\u0430\u0437\u043e\u0432\u044b\u0439",
@@ -284,7 +294,6 @@ function withQuestionDeleted(details: LectureDetails, questionId: string): Lectu
   };
 }
 
-
 const DRAFT_LECTURES_STORAGE_KEY = "vm_mobile_draft_lectures_v1000";
 
 type DraftStorageShape = {
@@ -360,7 +369,6 @@ function pickDraftLectureDetails(
     Object.entries(details).filter(([lectureId]) => lectureId.startsWith("draft-lecture-"))
   );
 }
-
 
 const WEB_DRAFTS_KEY_V4 = "vm_mobile_web_drafts_v1000";
 
@@ -449,7 +457,6 @@ function persistDraftsV4(
   });
 }
 
-
 function isDraftLecture(lectureId: string): boolean {
   return lectureId.startsWith("draft-lecture-");
 }
@@ -473,6 +480,18 @@ function mergeDraftLecturesIntoCatalog(
   return Array.from(next.values());
 }
 
+function withTeacherScope<T extends { teacherLogin?: string }>(
+  items: T[],
+  teacherLogin: string | null
+): T[] {
+  if (!teacherLogin) {
+    return items;
+  }
+
+  return items.map((item) =>
+    item.teacherLogin ? item : { ...item, teacherLogin }
+  );
+}
 
 const TEACHER_STATS_KEY = "vm.teacher.session.stats.v1";
 
@@ -545,7 +564,6 @@ function appendTeacherSessionResult(lectureId: string, correctCount: number) {
   writeTeacherSessionStats(current);
 }
 
-
 const VIDEO_LESSONS_STORAGE_KEY = "vm_mobile_video_lessons_v1";
 
 function readVideoLessons(): VideoLessonItem[] {
@@ -616,6 +634,7 @@ function writePhotoMaterials(value: PhotoMaterialItem[]) {
     storage.setItem(PHOTO_MATERIALS_STORAGE_KEY, JSON.stringify(value));
   } catch {}
 }
+
 export function AppNavigation() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("light");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -635,7 +654,124 @@ export function AppNavigation() {
   const [meetings, setMeetings] = useState<MeetingItem[]>([]);
   const [homeworks, setHomeworks] = useState<HomeworkItem[]>([]);
   const [homeworkSubmissions, setHomeworkSubmissions] = useState<HomeworkSubmissionItem[]>([]);
+  const [teacherBranches, setTeacherBranches] = useState<TeacherBranch[]>([]);
+  const [selectedTeacherLogin, setSelectedTeacherLogin] = useState<string | null>(null);
   const [latexDocument, setLatexDocument] = useState<LatexDocumentState>(readLatexDocument());
+
+  const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
+  const [currentResult, setCurrentResult] = useState<TaskResult | null>(null);
+  const [currentTeacherSession, setCurrentTeacherSession] = useState<TeacherManagedSession | null>(null);
+
+  const [catalogMode, setCatalogMode] = useState<DemoDataMode>("loading");
+  const [sessionMode, setSessionMode] = useState<DemoDataMode>("online");
+  const [isHydrating, setIsHydrating] = useState(true);
+
+  const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
+  const isTeacher = user.role === "teacher";
+
+  const selectedTeacherBranch = useMemo(
+    () => teacherBranches.find((branch) => branch.teacherLogin === selectedTeacherLogin) ?? null,
+    [teacherBranches, selectedTeacherLogin]
+  );
+
+  const scopedTeacherLogin = isTeacher ? user.login : selectedTeacherLogin;
+
+  const visibleLectures = useMemo(() => {
+    if (!scopedTeacherLogin) {
+      return isTeacher ? catalogLectures : [];
+    }
+
+    const scoped = catalogLectures.filter((lecture) => lecture.teacherLogin === scopedTeacherLogin);
+
+    if (scoped.length > 0) {
+      return scoped;
+    }
+
+    return catalogLectures.filter((lecture) => !lecture.teacherLogin);
+  }, [catalogLectures, isTeacher, scopedTeacherLogin]);
+
+  const visibleVideoLessons = useMemo(() => {
+    if (!scopedTeacherLogin) {
+      return isTeacher ? videoLessons : [];
+    }
+
+    const scoped = videoLessons.filter((lesson) => lesson.teacherLogin === scopedTeacherLogin);
+
+    if (scoped.length > 0) {
+      return scoped;
+    }
+
+    return videoLessons.filter((lesson) => !lesson.teacherLogin);
+  }, [isTeacher, scopedTeacherLogin, videoLessons]);
+
+  const visiblePhotoMaterials = useMemo(() => {
+    if (!scopedTeacherLogin) {
+      return isTeacher ? photoMaterials : [];
+    }
+
+    const scoped = photoMaterials.filter((material) => material.teacherLogin === scopedTeacherLogin);
+
+    if (scoped.length > 0) {
+      return scoped;
+    }
+
+    return photoMaterials.filter((material) => !material.teacherLogin);
+  }, [isTeacher, photoMaterials, scopedTeacherLogin]);
+
+  const visibleMeetings = useMemo(() => {
+    if (!scopedTeacherLogin) {
+      return isTeacher ? meetings : [];
+    }
+
+    const scoped = meetings.filter((meeting) => meeting.teacherLogin === scopedTeacherLogin);
+
+    if (scoped.length > 0) {
+      return scoped;
+    }
+
+    return meetings.filter((meeting) => !meeting.teacherLogin);
+  }, [isTeacher, meetings, scopedTeacherLogin]);
+
+  const visibleHomeworks = useMemo(() => {
+    if (!scopedTeacherLogin) {
+      return isTeacher ? homeworks : [];
+    }
+
+    const scoped = homeworks.filter((homework) => homework.teacherLogin === scopedTeacherLogin);
+
+    if (scoped.length > 0) {
+      return scoped;
+    }
+
+    return homeworks.filter((homework) => !homework.teacherLogin);
+  }, [homeworks, isTeacher, scopedTeacherLogin]);
+
+  const visibleHomeworkSubmissions = useMemo(() => {
+    if (!scopedTeacherLogin) {
+      return isTeacher ? homeworkSubmissions : [];
+    }
+
+    const scoped = homeworkSubmissions.filter(
+      (submission) => submission.teacherLogin === scopedTeacherLogin
+    );
+
+    const base = scoped.length > 0
+      ? scoped
+      : homeworkSubmissions.filter((submission) => !submission.teacherLogin);
+
+    return isTeacher
+      ? base
+      : base.filter((submission) => submission.studentLogin === user.login);
+  }, [homeworkSubmissions, isTeacher, scopedTeacherLogin, user.login]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !isTeacher) {
+      return;
+    }
+
+    ensureTeacherBranch(user.login, user.fullName || user.login);
+    adoptTeacherContent(user.login);
+  }, [isAuthenticated, isTeacher, user.fullName, user.login]);
 
   useEffect(() => {
     const savedDrafts = readDraftStorage();
@@ -665,16 +801,6 @@ export function AppNavigation() {
   useEffect(() => {
     writeVideoLessons(videoLessons);
   }, [videoLessons]);
-const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
-  const [currentResult, setCurrentResult] = useState<TaskResult | null>(null);
-  const [currentTeacherSession, setCurrentTeacherSession] = useState<TeacherManagedSession | null>(null);
-
-  const [catalogMode, setCatalogMode] = useState<DemoDataMode>("loading");
-  const [sessionMode, setSessionMode] = useState<DemoDataMode>("online");
-  const [isHydrating, setIsHydrating] = useState(true);
-
-  const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
-  const isTeacher = user.role === "teacher";
 
   useEffect(() => {
     let isMounted = true;
@@ -689,7 +815,9 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
           storedAuthMeta,
           storedMeetings,
           storedHomeworks,
-          storedHomeworkSubmissions
+          storedHomeworkSubmissions,
+          storedTeacherBranches,
+          storedSelectedTeacherLogin
         ] = await Promise.all([
           readCatalogSnapshot(),
           readLastLectureId(),
@@ -698,20 +826,33 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
           readAuthMeta(),
           readMeetings(),
           readHomeworks(),
-          readHomeworkSubmissions()
+          readHomeworkSubmissions(),
+          readTeacherBranches(),
+          readSelectedTeacherLogin()
         ]);
 
         if (!isMounted) {
           return;
         }
 
+        const teacherScopedLogin = storedAuthMeta?.role === "teacher" ? storedAuthMeta.userLogin : null;
         const webDraftState = readWebDraftStateV4();
 
         if (cachedLectures && cachedLectures.length > 0) {
-          setCatalogLectures(mergeWithDraftsV4(cachedLectures, webDraftState.lectures));
+          setCatalogLectures(
+            mergeWithDraftsV4(
+              withTeacherScope(cachedLectures, teacherScopedLogin),
+              webDraftState.lectures
+            )
+          );
           setCatalogMode("offline");
         } else {
-          setCatalogLectures(mergeWithDraftsV4(mockLectures, webDraftState.lectures));
+          setCatalogLectures(
+            mergeWithDraftsV4(
+              withTeacherScope(mockLectures, teacherScopedLogin),
+              webDraftState.lectures
+            )
+          );
         }
 
         if (Object.keys(webDraftState.lectureDetailsById).length > 0) {
@@ -734,15 +875,23 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
         }
 
         if (Array.isArray(storedMeetings) && storedMeetings.length > 0) {
-          setMeetings(storedMeetings);
+          setMeetings(withTeacherScope(storedMeetings, teacherScopedLogin));
         }
 
         if (Array.isArray(storedHomeworks) && storedHomeworks.length > 0) {
-          setHomeworks(storedHomeworks);
+          setHomeworks(withTeacherScope(storedHomeworks, teacherScopedLogin));
         }
 
         if (Array.isArray(storedHomeworkSubmissions) && storedHomeworkSubmissions.length > 0) {
-          setHomeworkSubmissions(storedHomeworkSubmissions);
+          setHomeworkSubmissions(withTeacherScope(storedHomeworkSubmissions, teacherScopedLogin));
+        }
+
+        if (Array.isArray(storedTeacherBranches) && storedTeacherBranches.length > 0) {
+          setTeacherBranches(storedTeacherBranches);
+        }
+
+        if (storedSelectedTeacherLogin) {
+          setSelectedTeacherLogin(storedSelectedTeacherLogin);
         }
 
         if (storedAuthMeta?.userLogin) {
@@ -752,8 +901,19 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
             role: storedAuthMeta.role,
             group: storedAuthMeta.group || mockUser.group
           });
+
+          if (storedAuthMeta.role === "teacher") {
+            ensureTeacherBranch(storedAuthMeta.userLogin, storedAuthMeta.fullName || storedAuthMeta.userLogin);
+          }
+
           setIsAuthenticated(true);
-          setActiveScreen(storedAuthMeta.role === "teacher" ? "teacherHome" : "catalog");
+          setActiveScreen(
+            storedAuthMeta.role === "teacher"
+              ? "teacherHome"
+              : storedSelectedTeacherLogin
+                ? "catalog"
+                : "teacherBranchSelect"
+          );
 
           try {
             const summaries = await catalogApi.listLectures();
@@ -768,8 +928,15 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
               )
             );
 
-            const webDraftState = readWebDraftStateV4();
-            const mergedLectures = mergeWithDraftsV4(nextLectures, webDraftState.lectures);
+            const scopedLectures =
+              storedAuthMeta.role === "teacher"
+                ? nextLectures.map((lecture) => ({
+                    ...lecture,
+                    teacherLogin: lecture.teacherLogin ?? storedAuthMeta.userLogin
+                  }))
+                : nextLectures;
+
+            const mergedLectures = mergeWithDraftsV4(scopedLectures, webDraftState.lectures);
 
             setCatalogLectures(mergedLectures);
             setLectureDetailsById((current) => ({
@@ -814,7 +981,6 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
     persistDraftsV4(catalogLectures, lectureDetailsById);
   }, [catalogLectures, lectureDetailsById, isHydrating]);
 
-
   useEffect(() => {
     if (isHydrating) {
       return;
@@ -823,7 +989,7 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
     void writeThemeMode(themeMode);
   }, [themeMode, isHydrating]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (isHydrating) {
       return;
     }
@@ -831,7 +997,7 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
     void writeNotificationsEnabled(notificationsEnabled);
   }, [notificationsEnabled, isHydrating]);
 
-    useEffect(() => {
+  useEffect(() => {
     if (isHydrating) {
       return;
     }
@@ -855,7 +1021,69 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
     void writeHomeworkSubmissions(homeworkSubmissions);
   }, [homeworkSubmissions, isHydrating]);
 
-  async function refreshCatalogFromApi() {
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    void writeTeacherBranches(teacherBranches);
+  }, [teacherBranches, isHydrating]);
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    void writeSelectedTeacherLogin(selectedTeacherLogin);
+  }, [selectedTeacherLogin, isHydrating]);
+
+  function ensureTeacherBranch(nextTeacherLogin: string, nextTeacherName: string) {
+    setTeacherBranches((current) => {
+      const existingIndex = current.findIndex((branch) => branch.teacherLogin === nextTeacherLogin);
+      const baseBranch: TeacherBranch = {
+        teacherLogin: nextTeacherLogin,
+        teacherName: nextTeacherName,
+        title: nextTeacherName,
+        description: `Материалы преподавателя ${nextTeacherName}`,
+        createdAt:
+          existingIndex === -1
+            ? new Date().toISOString()
+            : current[existingIndex].createdAt
+      };
+
+      if (existingIndex === -1) {
+        return [baseBranch, ...current];
+      }
+
+      const next = [...current];
+      next[existingIndex] = {
+        ...next[existingIndex],
+        teacherName: nextTeacherName,
+        title: next[existingIndex].title || baseBranch.title,
+        description: next[existingIndex].description || baseBranch.description
+      };
+
+      return next;
+    });
+  }
+
+  function adoptTeacherContent(nextTeacherLogin: string) {
+    setCatalogLectures((current) => withTeacherScope(current, nextTeacherLogin));
+    setVideoLessons((current) => withTeacherScope(current, nextTeacherLogin));
+    setPhotoMaterials((current) => withTeacherScope(current, nextTeacherLogin));
+    setMeetings((current) => withTeacherScope(current, nextTeacherLogin));
+    setHomeworks((current) => withTeacherScope(current, nextTeacherLogin));
+    setHomeworkSubmissions((current) => withTeacherScope(current, nextTeacherLogin));
+  }
+
+  function handleSelectTeacherBranch(nextTeacherLogin: string) {
+    setSelectedTeacherLogin(nextTeacherLogin);
+    resetStudentFlow();
+    resetTeacherFlow();
+    setActiveScreen("catalog");
+  }
+
+  async function refreshCatalogFromApi(nextTeacherLogin?: string) {
     setCatalogMode("loading");
 
     try {
@@ -868,10 +1096,16 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
         )
       );
 
-      const mergedLectures = mergeDraftLecturesIntoCatalog(nextLectures, catalogLectures);
+      const scopedLectures = nextTeacherLogin
+        ? nextLectures.map((lecture) => ({
+            ...lecture,
+            teacherLogin: lecture.teacherLogin ?? nextTeacherLogin
+          }))
+        : nextLectures;
+
+      const mergedLectures = mergeDraftLecturesIntoCatalog(scopedLectures, catalogLectures);
 
       setCatalogLectures(mergedLectures);
-
       setCatalogMode("online");
 
       await writeCatalogSnapshot(mergedLectures);
@@ -894,7 +1128,11 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
         [lecture.id]: details
       }));
 
-      const mappedLecture = mapLectureDetailsToLectureItem(details, lecture);
+      const mappedLecture = {
+        ...mapLectureDetailsToLectureItem(details, lecture),
+        teacherLogin: lecture.teacherLogin
+      };
+
       setCatalogLectures((current) => upsertLecture(current, mappedLecture));
       setSelectedLecture(mappedLecture);
 
@@ -905,67 +1143,79 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
   }
 
   async function handleLogin(
-  login: string,
-  password: string,
-  role: LoginRole
-): Promise<string | null> {
-  if (!login.trim() || !password.trim()) {
-    return "Р вЂ™Р Р†Р ВµР Т‘Р С‘РЎвЂљР Вµ Р В»Р С•Р С–Р С‘Р Р… Р С‘ Р С—Р В°РЎР‚Р С•Р В»РЎРЉ.";
+    login: string,
+    password: string,
+    role: LoginRole
+  ): Promise<string | null> {
+    if (!login.trim() || !password.trim()) {
+      return "Р вЂ™Р Р†Р ВµР Т‘Р С‘РЎвЂљР Вµ Р В»Р С•Р С–Р С‘Р Р… Р С‘ Р С—Р В°РЎР‚Р С•Р В»РЎРЉ.";
+    }
+
+    const nextUser: UserProfile = {
+      fullName: role === "teacher" ? "Преподаватель VisualMath" : "Студент VisualMath",
+      login: login.trim(),
+      role,
+      group: mockUser.group
+    };
+
+    await writeAuthMeta({
+      userLogin: nextUser.login,
+      role,
+      fullName: nextUser.fullName,
+      group: nextUser.group
+    });
+
+    if (role === "teacher") {
+      ensureTeacherBranch(nextUser.login, nextUser.fullName);
+      adoptTeacherContent(nextUser.login);
+    }
+
+    setUser(nextUser);
+    setIsAuthenticated(true);
+    setActiveScreen(
+      role === "teacher"
+        ? "teacherHome"
+        : selectedTeacherLogin
+          ? "catalog"
+          : "teacherBranchSelect"
+    );
+
+    try {
+      await refreshCatalogFromApi(role === "teacher" ? nextUser.login : undefined);
+    } catch {}
+
+    return null;
   }
 
-  const nextUser: UserProfile = {
-    fullName: role === "teacher" ? "Преподаватель VisualMath" : "Студент VisualMath",
-    login: login.trim(),
-    role,
-    group: mockUser.group
-  };
+  async function handleGoogleLogin(payload: GoogleLoginPayload): Promise<string | null> {
+    const safeEmail = (payload.email ?? "").trim();
+    const safeName = (payload.name ?? payload.fullName ?? "").trim();
+    const nextUser: UserProfile = {
+      fullName: safeName || safeEmail || "Студент Google",
+      login: safeEmail || "google_user",
+      role: "student",
+      group: mockUser.group
+    };
 
-  await writeAuthMeta({
-    userLogin: nextUser.login,
-    role,
-    fullName: nextUser.fullName,
-    group: nextUser.group
-  });
+    await writeAuthMeta({
+      userLogin: nextUser.login,
+      role: "student",
+      fullName: nextUser.fullName,
+      group: nextUser.group
+    });
 
-  setUser(nextUser);
-  setIsAuthenticated(true);
-  setActiveScreen(role === "teacher" ? "teacherHome" : "catalog");
+    setUser(nextUser);
+    setIsAuthenticated(true);
+    setActiveScreen(selectedTeacherLogin ? "catalog" : "teacherBranchSelect");
 
-  try {
-    await refreshCatalogFromApi();
-  } catch {}
+    try {
+      await refreshCatalogFromApi();
+    } catch {}
 
-  return null;
-}
+    return null;
+  }
 
-async function handleGoogleLogin(payload: GoogleLoginPayload): Promise<string | null> {
-  const safeEmail = (payload.email ?? "").trim();
-  const safeName = (payload.name ?? payload.fullName ?? "").trim();
-  const nextUser: UserProfile = {
-    fullName: safeName || safeEmail || "Студент Google",
-    login: safeEmail || "google_user",
-    role: "student",
-    group: mockUser.group
-  };
-
-  await writeAuthMeta({
-    userLogin: nextUser.login,
-    role: "student",
-    fullName: nextUser.fullName,
-    group: nextUser.group
-  });
-
-  setUser(nextUser);
-  setIsAuthenticated(true);
-  setActiveScreen("catalog");
-
-  try {
-    await refreshCatalogFromApi();
-  } catch {}
-
-  return null;
-}
-function resetStudentFlow() {
+  function resetStudentFlow() {
     setSelectedLecture(null);
     setCurrentSession(null);
     setCurrentResult(null);
@@ -976,34 +1226,32 @@ function resetStudentFlow() {
     setCurrentTeacherSession(null);
   }
 
-  
-
   function handleUpdateDraftLectureMeta(lectureId: string, input: DraftLectureMetaInput) {
-      setCatalogLectures((current) =>
-        current.map((lecture) => {
-          if (lecture.id !== lectureId) {
-            return lecture;
-          }
+    setCatalogLectures((current) =>
+      current.map((lecture) => {
+        if (lecture.id !== lectureId) {
+          return lecture;
+        }
 
-          const nextLecture = {
-            ...lecture,
-            subject: input.subject,
-            semester: input.semester,
-            level: input.level
-          } as LectureItem & { videoUrl?: string };
+        const nextLecture = {
+          ...lecture,
+          subject: input.subject,
+          semester: input.semester,
+          level: input.level
+        } as LectureItem & { videoUrl?: string };
 
-          const trimmedVideoUrl = input.videoUrl.trim();
+        const trimmedVideoUrl = input.videoUrl.trim();
 
-          if (trimmedVideoUrl) {
-            nextLecture.videoUrl = trimmedVideoUrl;
-          } else {
-            delete nextLecture.videoUrl;
-          }
+        if (trimmedVideoUrl) {
+          nextLecture.videoUrl = trimmedVideoUrl;
+        } else {
+          delete nextLecture.videoUrl;
+        }
 
-          return nextLecture;
-        })
-      );
-    }
+        return nextLecture;
+      })
+    );
+  }
 
   function handleDeleteLecture(lectureId: string) {
     setCatalogLectures((current) => current.filter((lecture) => lecture.id !== lectureId));
@@ -1020,7 +1268,7 @@ function resetStudentFlow() {
 
   function handleCreateDraftLecture(input: DraftLectureInput): string | null {
     const lectureId = `draft-lecture-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const nextLecture = createDraftLectureItem(lectureId, input, user.fullName);
+    const nextLecture = createDraftLectureItem(lectureId, input, user.fullName, user.login);
     const nextDetails = createDraftLectureDetails(lectureId, input);
 
     setCatalogLectures((current) => upsertLecture(current, nextLecture));
@@ -1035,7 +1283,7 @@ function resetStudentFlow() {
     return lectureId;
   }
 
-      function handleAddDraftQuestion(lectureId: string, input: DraftQuestionInput) {
+  function handleAddDraftQuestion(lectureId: string, input: DraftQuestionInput) {
     const lecture = catalogLectures.find((item) => item.id === lectureId) ?? null;
 
     setLectureDetailsById((current) => {
@@ -1046,7 +1294,6 @@ function resetStudentFlow() {
       }
 
       const questionId = `question-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      const correctOptionId = String(input.correctOptionKey).trim().toUpperCase();
 
       const nextQuestion: QuizQuestion = {
         id: questionId,
@@ -1105,7 +1352,7 @@ function resetStudentFlow() {
     });
   }
 
-function handleDeleteDraftQuestion(lectureId: string, questionId: string) {
+  function handleDeleteDraftQuestion(lectureId: string, questionId: string) {
     const lecture = catalogLectures.find((item) => item.id === lectureId) ?? null;
 
     setLectureDetailsById((current) => {
@@ -1134,17 +1381,20 @@ function handleDeleteDraftQuestion(lectureId: string, questionId: string) {
       title: nextTitle,
       url: nextUrl,
       authorName: fixText(user.fullName || "Visual Math Team"),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      teacherLogin: user.login
     };
 
     setVideoLessons((current: VideoLessonItem[]) => [nextLesson, ...current]);
   }
 
   function handleDeleteVideoLesson(lessonId: string) {
-    setVideoLessons((current: VideoLessonItem[]) => current.filter((lesson: VideoLessonItem) => lesson.id !== lessonId));
+    setVideoLessons((current: VideoLessonItem[]) =>
+      current.filter((lesson: VideoLessonItem) => lesson.id !== lessonId)
+    );
   }
 
-async function handleLogout() {
+  async function handleLogout() {
     setIsAuthenticated(false);
     setActiveScreen("catalog");
     setSelectedLecture(null);
@@ -1165,72 +1415,71 @@ async function handleLogout() {
   }
 
   async function handleOpenLecture(lecture: LectureItem) {
+    setSelectedLecture(lecture);
+    setLastOpenedLectureId(lecture.id);
+    void writeLastLectureId(lecture.id);
+    setCurrentSession(null);
+    setCurrentResult(null);
+    setActiveScreen("details");
 
-      setSelectedLecture(lecture);
-      setLastOpenedLectureId(lecture.id);
-      void writeLastLectureId(lecture.id);
-      setCurrentSession(null);
-      setCurrentResult(null);
-      setActiveScreen("details");
-
-      const details = await ensureLectureDetails(lecture);
-      if (!details) {
-        setCatalogMode("offline");
-      }
+    const details = await ensureLectureDetails(lecture);
+    if (!details) {
+      setCatalogMode("offline");
     }
+  }
 
   function handleBackToCatalog() {
     resetStudentFlow();
-    setActiveScreen("catalog");
+    setActiveScreen(selectedTeacherLogin ? "catalog" : "teacherBranchSelect");
   }
 
   async function handleOpenSession() {
-      if (!selectedLecture) {
-        return;
-      }
-
-      setSessionMode("loading");
-
-      const details =
-        lectureDetailsById[selectedLecture.id] ?? (await ensureLectureDetails(selectedLecture));
-
-      if (selectedLecture.id.startsWith("draft-lecture-")) {
-        setCurrentSession(createMockSession(selectedLecture, details));
-        setCurrentResult(null);
-        setSessionMode("online");
-        setActiveScreen("session");
-        return;
-      }
-
-      if (!details) {
-        setCurrentSession(createMockSession(selectedLecture));
-        setCurrentResult(null);
-        setSessionMode("offline");
-        setActiveScreen("session");
-        return;
-      }
-
-      try {
-        const sessionState = await sessionApi.getSession(selectedLecture.id);
-        const mappedSession = mapSessionToSessionData({
-          lecture: selectedLecture,
-          details,
-          sessionState
-        });
-
-        setCurrentSession(mappedSession);
-        setCurrentResult(null);
-        setSessionMode("online");
-        setActiveScreen("session");
-      } catch {
-        setCurrentSession(createMockSession(selectedLecture, details));
-        setCurrentResult(null);
-        setSessionMode("offline");
-        setActiveScreen("session");
-      }
+    if (!selectedLecture) {
+      return;
     }
 
-    function handleBackToLecture() {
+    setSessionMode("loading");
+
+    const details =
+      lectureDetailsById[selectedLecture.id] ?? (await ensureLectureDetails(selectedLecture));
+
+    if (selectedLecture.id.startsWith("draft-lecture-")) {
+      setCurrentSession(createMockSession(selectedLecture, details));
+      setCurrentResult(null);
+      setSessionMode("online");
+      setActiveScreen("session");
+      return;
+    }
+
+    if (!details) {
+      setCurrentSession(createMockSession(selectedLecture));
+      setCurrentResult(null);
+      setSessionMode("offline");
+      setActiveScreen("session");
+      return;
+    }
+
+    try {
+      const sessionState = await sessionApi.getSession(selectedLecture.id);
+      const mappedSession = mapSessionToSessionData({
+        lecture: selectedLecture,
+        details,
+        sessionState
+      });
+
+      setCurrentSession(mappedSession);
+      setCurrentResult(null);
+      setSessionMode("online");
+      setActiveScreen("session");
+    } catch {
+      setCurrentSession(createMockSession(selectedLecture, details));
+      setCurrentResult(null);
+      setSessionMode("offline");
+      setActiveScreen("session");
+    }
+  }
+
+  function handleBackToLecture() {
     setCurrentResult(null);
     setActiveScreen("details");
   }
@@ -1244,51 +1493,51 @@ async function handleLogout() {
   }
 
   async function handleSubmitTask(submission: TaskSubmission) {
-      if (!currentSession) {
-        return;
-      }
-
-      const result = evaluateSubmission(currentSession, submission);
-
-      appendTeacherSessionResult(currentSession.lectureId, result.correctCount);
-
-      setCurrentResult(result);
-      setActiveScreen("result");
-
-      if (currentTeacherSession && currentTeacherSession.lectureId === currentSession.lectureId) {
-        setCurrentTeacherSession((current) => {
-          if (!current) {
-            return current;
-          }
-
-          const participantIndex = current.participants.findIndex(
-            (participant) =>
-              participant.status === "online" || participant.status === "in-progress"
-          );
-
-          if (participantIndex === -1) {
-            return current;
-          }
-
-          const nextParticipants = current.participants.map((participant, index) =>
-            index === participantIndex
-              ? {
-                  ...participant,
-                  status: "completed" as const,
-                  score: result.correctCount
-                }
-              : participant
-          );
-
-          return {
-            ...current,
-            participants: nextParticipants
-          };
-        });
-      }
+    if (!currentSession) {
+      return;
     }
 
-    function handleBackToSession() {
+    const result = evaluateSubmission(currentSession, submission);
+
+    appendTeacherSessionResult(currentSession.lectureId, result.correctCount);
+
+    setCurrentResult(result);
+    setActiveScreen("result");
+
+    if (currentTeacherSession && currentTeacherSession.lectureId === currentSession.lectureId) {
+      setCurrentTeacherSession((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const participantIndex = current.participants.findIndex(
+          (participant) =>
+            participant.status === "online" || participant.status === "in-progress"
+        );
+
+        if (participantIndex === -1) {
+          return current;
+        }
+
+        const nextParticipants = current.participants.map((participant, index) =>
+          index === participantIndex
+            ? {
+                ...participant,
+                status: "completed" as const,
+                score: result.correctCount
+              }
+            : participant
+        );
+
+        return {
+          ...current,
+          participants: nextParticipants
+        };
+      });
+    }
+  }
+
+  function handleBackToSession() {
     setActiveScreen("session");
   }
 
@@ -1313,13 +1562,13 @@ async function handleLogout() {
   }
 
   function handleTeacherStartSession() {
-      if (!currentTeacherSession) {
-        return;
-      }
-
-      resetTeacherSessionStats(currentTeacherSession.lectureId);
-      setCurrentTeacherSession(updateTeacherSessionStatus(currentTeacherSession, "active"));
+    if (!currentTeacherSession) {
+      return;
     }
+
+    resetTeacherSessionStats(currentTeacherSession.lectureId);
+    setCurrentTeacherSession(updateTeacherSessionStatus(currentTeacherSession, "active"));
+  }
 
   function handleTeacherStopSession() {
     if (!currentTeacherSession) {
@@ -1362,7 +1611,6 @@ async function handleLogout() {
     }
   }
 
-
   function handleCreatePhotoMaterial(input: { title: string; imageUrl: string; note: string }) {
     const nextTitle = input.title.trim();
     const nextImageUrl = input.imageUrl.trim();
@@ -1378,7 +1626,8 @@ async function handleLogout() {
       imageUrl: nextImageUrl,
       note: nextNote,
       authorName: user.fullName || "Visual Math Team",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      teacherLogin: user.login
     };
 
     setPhotoMaterials((current: PhotoMaterialItem[]) => [nextMaterial, ...current]);
@@ -1389,7 +1638,8 @@ async function handleLogout() {
       current.filter((material: PhotoMaterialItem) => material.id !== materialId)
     );
   }
-    function handleCreateMeeting(input: MeetingDraftInput) {
+
+  function handleCreateMeeting(input: MeetingDraftInput) {
     const nextMeeting: MeetingItem = {
       id: `meeting-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       title: input.title.trim(),
@@ -1399,7 +1649,8 @@ async function handleLogout() {
       durationMin: input.durationMin,
       description: input.description.trim(),
       createdBy: fixText(user.fullName || user.login || "Visual Math Team"),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      teacherLogin: user.login
     };
 
     setMeetings((current: MeetingItem[]) =>
@@ -1415,6 +1666,7 @@ async function handleLogout() {
       current.filter((meeting: MeetingItem) => meeting.id !== meetingId)
     );
   }
+
   function handleCreateHomework(input: HomeworkDraftInput) {
     const nextHomework: HomeworkItem = {
       id: `homework-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1424,7 +1676,8 @@ async function handleLogout() {
       allowedFormats: input.allowedFormats.map((item) => item.trim().toLowerCase()),
       maxScore: input.maxScore,
       createdBy: fixText(user.fullName || user.login || "Visual Math Team"),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      teacherLogin: user.login
     };
 
     setHomeworks((current: HomeworkItem[]) =>
@@ -1446,6 +1699,8 @@ async function handleLogout() {
   }
 
   function handleCreateHomeworkSubmission(input: HomeworkSubmissionDraftInput) {
+    const relatedHomework = homeworks.find((homework) => homework.id === input.homeworkId) ?? null;
+
     const nextSubmission: HomeworkSubmissionItem = {
       id: `submission-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       homeworkId: input.homeworkId,
@@ -1456,7 +1711,8 @@ async function handleLogout() {
       fileData: input.fileData,
       submittedAt: new Date().toISOString(),
       teacherComment: "",
-      score: null
+      score: null,
+      teacherLogin: relatedHomework?.teacherLogin ?? selectedTeacherLogin ?? undefined
     };
 
     setHomeworkSubmissions((current: HomeworkSubmissionItem[]) => [
@@ -1491,101 +1747,109 @@ async function handleLogout() {
       )
     );
   }
-function handleMenuNavigate(
-      screen: "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "latex" | "profile"
-    ) {
-      setIsMenuOpen(false);
 
-      if (screen === "profile") {
-        resetTeacherFlow();
-        setActiveScreen("profile");
-        return;
-      }
+  function handleMenuNavigate(
+    screen: "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "teacherBranchSelect" | "latex" | "profile"
+  ) {
+    setIsMenuOpen(false);
 
-      if (screen === "solver") {
-        resetStudentFlow();
-        resetTeacherFlow();
-        setActiveScreen("solver");
-        return;
-      }
-
-      if (screen === "videoLessons") {
-        resetStudentFlow();
-        resetTeacherFlow();
-        setActiveScreen("videoLessons");
-        return;
-      }
-
-      if (screen === "photoMaterials") {
-        resetStudentFlow();
-        resetTeacherFlow();
-        setActiveScreen("photoMaterials");
-        return;
-      }
-
-      if (screen === "meetings") {
-        resetStudentFlow();
-        resetTeacherFlow();
-        setActiveScreen("meetings");
-        return;
-      }
-
-      if (screen === "homework") {
-        resetStudentFlow();
-        resetTeacherFlow();
-        setActiveScreen("homework");
-        return;
-      }
-
-      if (screen === "grades") {
-        resetStudentFlow();
-        resetTeacherFlow();
-        setActiveScreen("grades");
-        return;
-      }
-
-      if (screen === "latex") {
-        resetStudentFlow();
-        resetTeacherFlow();
-        setActiveScreen("latex");
-        return;
-      }
-
-resetTeacherFlow();
-
-      if (isTeacher) {
-        setActiveScreen("teacherHome");
-        return;
-      }
-
-      handleBackToCatalog();
+    if (screen === "profile") {
+      resetTeacherFlow();
+      setActiveScreen("profile");
+      return;
     }
+
+    if (screen === "solver") {
+      resetStudentFlow();
+      resetTeacherFlow();
+      setActiveScreen("solver");
+      return;
+    }
+
+    if (screen === "videoLessons") {
+      resetStudentFlow();
+      resetTeacherFlow();
+      setActiveScreen("videoLessons");
+      return;
+    }
+
+    if (screen === "photoMaterials") {
+      resetStudentFlow();
+      resetTeacherFlow();
+      setActiveScreen("photoMaterials");
+      return;
+    }
+
+    if (screen === "meetings") {
+      resetStudentFlow();
+      resetTeacherFlow();
+      setActiveScreen("meetings");
+      return;
+    }
+
+    if (screen === "homework") {
+      resetStudentFlow();
+      resetTeacherFlow();
+      setActiveScreen("homework");
+      return;
+    }
+
+    if (screen === "grades") {
+      resetStudentFlow();
+      resetTeacherFlow();
+      setActiveScreen("grades");
+      return;
+    }
+
+    if (screen === "teacherBranchSelect") {
+      resetStudentFlow();
+      resetTeacherFlow();
+      setActiveScreen(isTeacher ? "teacherHome" : "teacherBranchSelect");
+      return;
+    }
+
+    if (screen === "latex") {
+      resetStudentFlow();
+      resetTeacherFlow();
+      setActiveScreen("latex");
+      return;
+    }
+
+    resetTeacherFlow();
+
+    if (isTeacher) {
+      setActiveScreen("teacherHome");
+      return;
+    }
+
+    handleBackToCatalog();
+  }
 
   function handleBottomTabChange(
-      screen: "catalog" | "solver" | "videoLessons" | "profile"
-    ) {
-      if (screen === "profile") {
-        resetTeacherFlow();
-        setActiveScreen("profile");
-        return;
-      }
-
-      if (screen === "solver") {
-        resetStudentFlow();
-        resetTeacherFlow();
-        setActiveScreen("solver");
-        return;
-      }
-
+    screen: "catalog" | "solver" | "videoLessons" | "profile"
+  ) {
+    if (screen === "profile") {
       resetTeacherFlow();
-
-      if (isTeacher) {
-        setActiveScreen("teacherHome");
-        return;
-      }
-
-      handleBackToCatalog();
+      setActiveScreen("profile");
+      return;
     }
+
+    if (screen === "solver") {
+      resetStudentFlow();
+      resetTeacherFlow();
+      setActiveScreen("solver");
+      return;
+    }
+
+    resetTeacherFlow();
+
+    if (isTeacher) {
+      setActiveScreen("teacherHome");
+      return;
+    }
+
+    handleBackToCatalog();
+  }
 
   if (isHydrating) {
     return (
@@ -1600,7 +1864,7 @@ resetTeacherFlow();
   }
 
   const lastOpenedLecture =
-    catalogLectures.find((lecture) => lecture.id === lastOpenedLectureId) ?? null;
+    visibleLectures.find((lecture) => lecture.id === lastOpenedLectureId) ?? null;
 
   const activeBottomTab: "catalog" | "teacher" | "profile" = isTeacher
     ? activeScreen === "profile"
@@ -1677,7 +1941,7 @@ resetTeacherFlow();
               color: theme.colors.text
             }}
           >
-            {isTeacher ? "Преподаватель" : "Студент"}
+            {isTeacher ? "Преподаватель" : selectedTeacherBranch?.teacherName || "Выбор ветки"}
           </Text>
         </View>
       </View>
@@ -1704,6 +1968,7 @@ resetTeacherFlow();
         >
           {[
             { key: "catalog", label: "Каталог" },
+            { key: "teacherBranchSelect", label: "Преподаватель" },
             { key: "profile", label: "Профиль" },
             { key: "videoLessons", label: "Видеоуроки" },
             { key: "photoMaterials", label: "Фото" },
@@ -1717,7 +1982,7 @@ resetTeacherFlow();
               key={item.key}
               onPress={() =>
                 handleMenuNavigate(
-                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "latex" | "profile"
+                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "teacherBranchSelect" | "latex" | "profile"
                 )
               }
               style={{
@@ -1751,11 +2016,26 @@ resetTeacherFlow();
           ))}
         </View>
       ) : null}
+
       <View style={styles.content}>
+        {!isTeacher && activeScreen === "teacherBranchSelect" ? (
+          <TeacherBranchSelectScreen
+            theme={theme}
+            branches={teacherBranches}
+            selectedTeacherLogin={selectedTeacherLogin}
+            onSelectTeacher={handleSelectTeacherBranch}
+            onContinue={() => {
+              if (selectedTeacherLogin) {
+                handleSelectTeacherBranch(selectedTeacherLogin);
+              }
+            }}
+          />
+        ) : null}
+
         {!isTeacher && activeScreen === "catalog" ? (
           <CatalogScreen
             theme={theme}
-            lectures={catalogLectures}
+            lectures={visibleLectures}
             lastOpenedLecture={lastOpenedLecture}
             isLoading={catalogMode === "loading"}
             hasError={catalogMode === "error"}
@@ -1810,7 +2090,7 @@ resetTeacherFlow();
           <TeacherHomeScreen
             theme={theme}
             user={user}
-            lectures={catalogLectures}
+            lectures={visibleLectures}
             lectureDetailsById={lectureDetailsById}
             onOpenManageSession={(lecture) => void handleOpenManageTeacherSession(lecture)}
             onCreateDraftLecture={handleCreateDraftLecture}
@@ -1835,17 +2115,17 @@ resetTeacherFlow();
         ) : null}
 
         {activeScreen === "solver" ? (
-            <SolverScreen
-              theme={theme}
-              onBack={handleBackToCatalog}
-            />
-          ) : null}
+          <SolverScreen
+            theme={theme}
+            onBack={handleBackToCatalog}
+          />
+        ) : null}
 
         {activeScreen === "videoLessons" ? (
           <VideoLessonsScreen
             theme={theme}
             isTeacher={isTeacher}
-            lessons={videoLessons}
+            lessons={visibleVideoLessons}
             onCreateLesson={handleCreateVideoLesson}
             onDeleteLesson={handleDeleteVideoLesson}
           />
@@ -1855,7 +2135,7 @@ resetTeacherFlow();
           <PhotoMaterialsScreen
             theme={theme}
             isTeacher={isTeacher}
-            materials={photoMaterials}
+            materials={visiblePhotoMaterials}
             onCreateMaterial={handleCreatePhotoMaterial}
             onDeleteMaterial={handleDeletePhotoMaterial}
           />
@@ -1865,7 +2145,7 @@ resetTeacherFlow();
           <MeetingsScreen
             theme={theme}
             isTeacher={isTeacher}
-            meetings={meetings}
+            meetings={visibleMeetings}
             onCreateMeeting={handleCreateMeeting}
             onDeleteMeeting={handleDeleteMeeting}
           />
@@ -1877,8 +2157,8 @@ resetTeacherFlow();
             isTeacher={isTeacher}
             userLogin={user.login}
             userName={user.fullName || user.login}
-            homeworks={homeworks}
-            submissions={homeworkSubmissions}
+            homeworks={visibleHomeworks}
+            submissions={visibleHomeworkSubmissions}
             onCreateHomework={handleCreateHomework}
             onDeleteHomework={handleDeleteHomework}
             onCreateSubmission={handleCreateHomeworkSubmission}
@@ -1893,8 +2173,8 @@ resetTeacherFlow();
             isTeacher={isTeacher}
             userLogin={user.login}
             userName={user.fullName || user.login}
-            homeworks={homeworks}
-            submissions={homeworkSubmissions}
+            homeworks={visibleHomeworks}
+            submissions={visibleHomeworkSubmissions}
             onGradeSubmission={handleGradeHomeworkSubmission}
           />
         ) : null}
@@ -1909,7 +2189,7 @@ resetTeacherFlow();
           />
         ) : null}
 
-          {activeScreen === "profile" ? (
+        {activeScreen === "profile" ? (
           <ProfileScreen
             theme={theme}
             user={user}
@@ -1936,7 +2216,8 @@ resetTeacherFlow();
         ) : null}
       </View>
     </View>
-  );}
+  );
+}
 
 type BottomTabsProps = {
   theme: AppTheme;
@@ -2050,6 +2331,3 @@ const styles = StyleSheet.create({
     fontWeight: "700"
   }
 });
-
-
-

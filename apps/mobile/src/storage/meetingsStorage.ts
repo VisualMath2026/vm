@@ -10,6 +10,7 @@ export type MeetingItem = {
   description: string;
   createdBy: string;
   createdAt: string;
+  teacherLogin?: string;
 };
 
 const storage = createAsyncStorage("vmMeetings_v1");
