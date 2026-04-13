@@ -19,6 +19,9 @@ import { SessionScreen } from "../screens/SessionScreen";
 import { SolverScreen } from "../screens/SolverScreen";
 import { VideoLessonsScreen, type VideoLessonItem } from "../screens/VideoLessonsScreen";
 import { PhotoMaterialsScreen, type PhotoMaterialItem } from "../screens/PhotoMaterialsScreen";
+import { MeetingsScreen, type MeetingDraftInput } from "../screens/MeetingsScreen";
+import { HomeworkScreen, type HomeworkDraftInput, type HomeworkSubmissionDraftInput } from "../screens/HomeworkScreen";
+import { GradesScreen } from "../screens/GradesScreen";
 import { LatexWorkspaceScreen } from "../screens/LatexWorkspaceScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
@@ -41,6 +44,15 @@ import {
 } from "../storage/mobileCache";
 import { createAppTheme, type AppTheme, type ThemeMode } from "../theme";
 import { readLatexDocument, writeLatexDocument, type LatexDocumentState } from "../storage/latexStorage";
+import { readMeetings, writeMeetings, type MeetingItem } from "../storage/meetingsStorage";
+import {
+  readHomeworks,
+  readHomeworkSubmissions,
+  writeHomeworks,
+  writeHomeworkSubmissions,
+  type HomeworkItem,
+  type HomeworkSubmissionItem
+} from "../storage/homeworkStorage";
 import { fixText } from "../utils/fixText";
 import { authApi, catalogApi, quizApi, sessionApi, toUserMessage } from "../api/mobileApi";
 import {
@@ -63,6 +75,9 @@ type ScreenKey =
   | "solver"
   | "videoLessons"
   | "photoMaterials"
+  | "meetings"
+  | "homework"
+  | "grades"
   | "latex"
   | "profile";
 
@@ -617,6 +632,9 @@ export function AppNavigation() {
   const [draftsLoaded, setDraftsLoaded] = useState(false);
   const [videoLessons, setVideoLessons] = useState<VideoLessonItem[]>(readVideoLessons());
   const [photoMaterials, setPhotoMaterials] = useState<PhotoMaterialItem[]>(readPhotoMaterials());
+  const [meetings, setMeetings] = useState<MeetingItem[]>([]);
+  const [homeworks, setHomeworks] = useState<HomeworkItem[]>([]);
+  const [homeworkSubmissions, setHomeworkSubmissions] = useState<HomeworkSubmissionItem[]>([]);
   const [latexDocument, setLatexDocument] = useState<LatexDocumentState>(readLatexDocument());
 
   useEffect(() => {
@@ -668,13 +686,19 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
           cachedLastLectureId,
           cachedThemeMode,
           cachedNotificationsEnabled,
-          storedAuthMeta
+          storedAuthMeta,
+          storedMeetings,
+          storedHomeworks,
+          storedHomeworkSubmissions
         ] = await Promise.all([
           readCatalogSnapshot(),
           readLastLectureId(),
           readThemeMode(),
           readNotificationsEnabled(),
-          readAuthMeta()
+          readAuthMeta(),
+          readMeetings(),
+          readHomeworks(),
+          readHomeworkSubmissions()
         ]);
 
         if (!isMounted) {
@@ -707,6 +731,18 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
 
         if (typeof cachedNotificationsEnabled === "boolean") {
           setNotificationsEnabled(cachedNotificationsEnabled);
+        }
+
+        if (Array.isArray(storedMeetings) && storedMeetings.length > 0) {
+          setMeetings(storedMeetings);
+        }
+
+        if (Array.isArray(storedHomeworks) && storedHomeworks.length > 0) {
+          setHomeworks(storedHomeworks);
+        }
+
+        if (Array.isArray(storedHomeworkSubmissions) && storedHomeworkSubmissions.length > 0) {
+          setHomeworkSubmissions(storedHomeworkSubmissions);
         }
 
         if (storedAuthMeta?.userLogin) {
@@ -787,13 +823,37 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
     void writeThemeMode(themeMode);
   }, [themeMode, isHydrating]);
 
-  useEffect(() => {
+    useEffect(() => {
     if (isHydrating) {
       return;
     }
 
     void writeNotificationsEnabled(notificationsEnabled);
   }, [notificationsEnabled, isHydrating]);
+
+    useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    void writeMeetings(meetings);
+  }, [meetings, isHydrating]);
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    void writeHomeworks(homeworks);
+  }, [homeworks, isHydrating]);
+
+  useEffect(() => {
+    if (isHydrating) {
+      return;
+    }
+
+    void writeHomeworkSubmissions(homeworkSubmissions);
+  }, [homeworkSubmissions, isHydrating]);
 
   async function refreshCatalogFromApi() {
     setCatalogMode("loading");
@@ -854,7 +914,7 @@ const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
   }
 
   const nextUser: UserProfile = {
-    fullName: role === "teacher" ? "Р СћР ВµРЎРѓРЎвЂљР С•Р Р†РЎвЂ№Р в„– Р С—РЎР‚Р ВµР С—Р С•Р Т‘Р В°Р Р†Р В°РЎвЂљР ВµР В»РЎРЉ" : "Р СћР ВµРЎРѓРЎвЂљР С•Р Р†РЎвЂ№Р в„– РЎРѓРЎвЂљРЎС“Р Т‘Р ВµР Р…РЎвЂљ",
+    fullName: role === "teacher" ? "Преподаватель VisualMath" : "Студент VisualMath",
     login: login.trim(),
     role,
     group: mockUser.group
@@ -882,7 +942,7 @@ async function handleGoogleLogin(payload: GoogleLoginPayload): Promise<string | 
   const safeEmail = (payload.email ?? "").trim();
   const safeName = (payload.name ?? payload.fullName ?? "").trim();
   const nextUser: UserProfile = {
-    fullName: safeName || safeEmail || "Google пользователь",
+    fullName: safeName || safeEmail || "Студент Google",
     login: safeEmail || "google_user",
     role: "student",
     group: mockUser.group
@@ -1329,8 +1389,110 @@ async function handleLogout() {
       current.filter((material: PhotoMaterialItem) => material.id !== materialId)
     );
   }
-  function handleMenuNavigate(
-      screen: "catalog" | "solver" | "videoLessons" | "photoMaterials" | "latex" | "profile"
+    function handleCreateMeeting(input: MeetingDraftInput) {
+    const nextMeeting: MeetingItem = {
+      id: `meeting-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: input.title.trim(),
+      platform: input.platform.trim(),
+      url: input.url.trim(),
+      scheduledAt: input.scheduledAt,
+      durationMin: input.durationMin,
+      description: input.description.trim(),
+      createdBy: fixText(user.fullName || user.login || "Visual Math Team"),
+      createdAt: new Date().toISOString()
+    };
+
+    setMeetings((current: MeetingItem[]) =>
+      [nextMeeting, ...current].sort(
+        (left, right) =>
+          new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime()
+      )
+    );
+  }
+
+  function handleDeleteMeeting(meetingId: string) {
+    setMeetings((current: MeetingItem[]) =>
+      current.filter((meeting: MeetingItem) => meeting.id !== meetingId)
+    );
+  }
+  function handleCreateHomework(input: HomeworkDraftInput) {
+    const nextHomework: HomeworkItem = {
+      id: `homework-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      dueAt: input.dueAt,
+      allowedFormats: input.allowedFormats.map((item) => item.trim().toLowerCase()),
+      maxScore: input.maxScore,
+      createdBy: fixText(user.fullName || user.login || "Visual Math Team"),
+      createdAt: new Date().toISOString()
+    };
+
+    setHomeworks((current: HomeworkItem[]) =>
+      [nextHomework, ...current].sort(
+        (left, right) =>
+          new Date(left.dueAt).getTime() - new Date(right.dueAt).getTime()
+      )
+    );
+  }
+
+  function handleDeleteHomework(homeworkId: string) {
+    setHomeworks((current: HomeworkItem[]) =>
+      current.filter((homework: HomeworkItem) => homework.id !== homeworkId)
+    );
+
+    setHomeworkSubmissions((current: HomeworkSubmissionItem[]) =>
+      current.filter((submission: HomeworkSubmissionItem) => submission.homeworkId !== homeworkId)
+    );
+  }
+
+  function handleCreateHomeworkSubmission(input: HomeworkSubmissionDraftInput) {
+    const nextSubmission: HomeworkSubmissionItem = {
+      id: `submission-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      homeworkId: input.homeworkId,
+      studentLogin: input.studentLogin,
+      studentName: fixText(input.studentName),
+      fileName: input.fileName,
+      fileType: input.fileType,
+      fileData: input.fileData,
+      submittedAt: new Date().toISOString(),
+      teacherComment: "",
+      score: null
+    };
+
+    setHomeworkSubmissions((current: HomeworkSubmissionItem[]) => [
+      nextSubmission,
+      ...current.filter(
+        (submission: HomeworkSubmissionItem) =>
+          !(submission.homeworkId === input.homeworkId && submission.studentLogin === input.studentLogin)
+      )
+    ]);
+  }
+
+  function handleDeleteHomeworkSubmission(submissionId: string) {
+    setHomeworkSubmissions((current: HomeworkSubmissionItem[]) =>
+      current.filter((submission: HomeworkSubmissionItem) => submission.id !== submissionId)
+    );
+  }
+
+  function handleGradeHomeworkSubmission(
+    submissionId: string,
+    score: number | null,
+    comment: string
+  ) {
+    setHomeworkSubmissions((current: HomeworkSubmissionItem[]) =>
+      current.map((submission: HomeworkSubmissionItem) =>
+        submission.id === submissionId
+          ? {
+              ...submission,
+              score,
+              teacherComment: comment
+            }
+          : submission
+      )
+    );
+  }
+function handleMenuNavigate(
+      screen: "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "latex" | "profile"
     ) {
       setIsMenuOpen(false);
 
@@ -1361,7 +1523,27 @@ async function handleLogout() {
         return;
       }
 
-      
+      if (screen === "meetings") {
+        resetStudentFlow();
+        resetTeacherFlow();
+        setActiveScreen("meetings");
+        return;
+      }
+
+      if (screen === "homework") {
+        resetStudentFlow();
+        resetTeacherFlow();
+        setActiveScreen("homework");
+        return;
+      }
+
+      if (screen === "grades") {
+        resetStudentFlow();
+        resetTeacherFlow();
+        setActiveScreen("grades");
+        return;
+      }
+
       if (screen === "latex") {
         resetStudentFlow();
         resetTeacherFlow();
@@ -1476,7 +1658,28 @@ resetTeacherFlow();
           VisualMath
         </Text>
 
-        <View style={{ width: 40, height: 40 }} />
+        <View
+          style={{
+            minHeight: 40,
+            paddingHorizontal: theme.spacing.md,
+            borderRadius: theme.radius.pill,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: theme.colors.surfaceMuted,
+            borderWidth: 1,
+            borderColor: theme.colors.border
+          }}
+        >
+          <Text
+            style={{
+              fontSize: theme.typography.caption,
+              fontWeight: "800",
+              color: theme.colors.text
+            }}
+          >
+            {isTeacher ? "Преподаватель" : "Студент"}
+          </Text>
+        </View>
       </View>
 
       {isMenuOpen ? (
@@ -1504,6 +1707,9 @@ resetTeacherFlow();
             { key: "profile", label: "Профиль" },
             { key: "videoLessons", label: "Видеоуроки" },
             { key: "photoMaterials", label: "Фото" },
+            { key: "meetings", label: "Миты" },
+            { key: "homework", label: "ДЗ" },
+            { key: "grades", label: "Итоги" },
             { key: "latex", label: "LaTeX" },
             { key: "solver", label: "Уравнения" }
           ].map((item) => (
@@ -1511,7 +1717,7 @@ resetTeacherFlow();
               key={item.key}
               onPress={() =>
                 handleMenuNavigate(
-                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "latex" | "profile"
+                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "latex" | "profile"
                 )
               }
               style={{
@@ -1654,7 +1860,46 @@ resetTeacherFlow();
             onDeleteMaterial={handleDeletePhotoMaterial}
           />
         ) : null}
-          {activeScreen === "latex" ? (
+
+        {activeScreen === "meetings" ? (
+          <MeetingsScreen
+            theme={theme}
+            isTeacher={isTeacher}
+            meetings={meetings}
+            onCreateMeeting={handleCreateMeeting}
+            onDeleteMeeting={handleDeleteMeeting}
+          />
+        ) : null}
+
+        {activeScreen === "homework" ? (
+          <HomeworkScreen
+            theme={theme}
+            isTeacher={isTeacher}
+            userLogin={user.login}
+            userName={user.fullName || user.login}
+            homeworks={homeworks}
+            submissions={homeworkSubmissions}
+            onCreateHomework={handleCreateHomework}
+            onDeleteHomework={handleDeleteHomework}
+            onCreateSubmission={handleCreateHomeworkSubmission}
+            onDeleteSubmission={handleDeleteHomeworkSubmission}
+            onGradeSubmission={handleGradeHomeworkSubmission}
+          />
+        ) : null}
+
+        {activeScreen === "grades" ? (
+          <GradesScreen
+            theme={theme}
+            isTeacher={isTeacher}
+            userLogin={user.login}
+            userName={user.fullName || user.login}
+            homeworks={homeworks}
+            submissions={homeworkSubmissions}
+            onGradeSubmission={handleGradeHomeworkSubmission}
+          />
+        ) : null}
+
+        {activeScreen === "latex" ? (
           <LatexWorkspaceScreen
             theme={theme}
             isTeacher={isTeacher}
