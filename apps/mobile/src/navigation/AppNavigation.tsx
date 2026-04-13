@@ -19,6 +19,7 @@ import { SessionScreen } from "../screens/SessionScreen";
 import { SolverScreen } from "../screens/SolverScreen";
 import { VideoLessonsScreen, type VideoLessonItem } from "../screens/VideoLessonsScreen";
 import { PhotoMaterialsScreen, type PhotoMaterialItem } from "../screens/PhotoMaterialsScreen";
+import { LatexWorkspaceScreen } from "../screens/LatexWorkspaceScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
 import { TaskScreen } from "../screens/TaskScreen";
 import { TeacherHomeScreen, type DraftLectureInput, type DraftLectureMetaInput, type DraftQuestionInput } from "../screens/TeacherHomeScreen";
@@ -39,6 +40,7 @@ import {
   writeThemeMode
 } from "../storage/mobileCache";
 import { createAppTheme, type AppTheme, type ThemeMode } from "../theme";
+import { readLatexDocument, writeLatexDocument, type LatexDocumentState } from "../storage/latexStorage";
 import { fixText } from "../utils/fixText";
 import { authApi, catalogApi, quizApi, sessionApi, toUserMessage } from "../api/mobileApi";
 import {
@@ -61,6 +63,7 @@ type ScreenKey =
   | "solver"
   | "videoLessons"
   | "photoMaterials"
+  | "latex"
   | "profile";
 
 type LoginRole = "student" | "teacher";
@@ -614,6 +617,7 @@ export function AppNavigation() {
   const [draftsLoaded, setDraftsLoaded] = useState(false);
   const [videoLessons, setVideoLessons] = useState<VideoLessonItem[]>(readVideoLessons());
   const [photoMaterials, setPhotoMaterials] = useState<PhotoMaterialItem[]>(readPhotoMaterials());
+  const [latexDocument, setLatexDocument] = useState<LatexDocumentState>(readLatexDocument());
 
   useEffect(() => {
     const savedDrafts = readDraftStorage();
@@ -1324,7 +1328,7 @@ async function handleLogout() {
     );
   }
   function handleMenuNavigate(
-      screen: "catalog" | "solver" | "videoLessons" | "photoMaterials" | "profile"
+      screen: "catalog" | "solver" | "videoLessons" | "photoMaterials" | "latex" | "profile"
     ) {
       setIsMenuOpen(false);
 
@@ -1355,7 +1359,15 @@ async function handleLogout() {
         return;
       }
 
-      resetTeacherFlow();
+      
+      if (screen === "latex") {
+        resetStudentFlow();
+        resetTeacherFlow();
+        setActiveScreen("latex");
+        return;
+      }
+
+resetTeacherFlow();
 
       if (isTeacher) {
         setActiveScreen("teacherHome");
@@ -1490,13 +1502,14 @@ async function handleLogout() {
             { key: "profile", label: "Профиль" },
             { key: "videoLessons", label: "Видеоуроки" },
             { key: "photoMaterials", label: "Фото" },
+            { key: "latex", label: "LaTeX" },
             { key: "solver", label: "Уравнения" }
           ].map((item) => (
             <Pressable
               key={item.key}
               onPress={() =>
                 handleMenuNavigate(
-                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "profile"
+                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "latex" | "profile"
                 )
               }
               style={{
@@ -1639,6 +1652,16 @@ async function handleLogout() {
             onDeleteMaterial={handleDeletePhotoMaterial}
           />
         ) : null}
+          {activeScreen === "latex" ? (
+          <LatexWorkspaceScreen
+            theme={theme}
+            isTeacher={isTeacher}
+            userName={user.fullName || user.login}
+            document={latexDocument}
+            onChangeDocument={setLatexDocument}
+          />
+        ) : null}
+
           {activeScreen === "profile" ? (
           <ProfileScreen
             theme={theme}
