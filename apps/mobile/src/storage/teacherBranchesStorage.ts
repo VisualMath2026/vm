@@ -1,4 +1,4 @@
-﻿import { createAsyncStorage } from "@react-native-async-storage/async-storage";
+﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type TeacherBranch = {
   teacherLogin: string;
@@ -8,15 +8,13 @@ export type TeacherBranch = {
   createdAt: string;
 };
 
-const storage = createAsyncStorage("vmTeacherBranches_v1");
-
 const STORAGE_KEYS = {
-  branches: "teacherBranches_v1",
-  selectedTeacherLogin: "selectedTeacherLogin_v1"
+  branches: "vmTeacherBranches_v1:teacherBranches_v1",
+  selectedTeacherLogin: "vmTeacherBranches_v1:selectedTeacherLogin_v1"
 } as const;
 
 async function readJson<T>(key: string): Promise<T | null> {
-  const value = await storage.getItem(key);
+  const value = await AsyncStorage.getItem(key);
 
   if (!value) {
     return null;
@@ -30,7 +28,7 @@ async function readJson<T>(key: string): Promise<T | null> {
 }
 
 async function writeJson<T>(key: string, value: T): Promise<void> {
-  await storage.setItem(key, JSON.stringify(value));
+  await AsyncStorage.setItem(key, JSON.stringify(value));
 }
 
 export async function readTeacherBranches(): Promise<TeacherBranch[] | null> {
@@ -42,14 +40,14 @@ export async function writeTeacherBranches(branches: TeacherBranch[]): Promise<v
 }
 
 export async function readSelectedTeacherLogin(): Promise<string | null> {
-  return storage.getItem(STORAGE_KEYS.selectedTeacherLogin);
+  return AsyncStorage.getItem(STORAGE_KEYS.selectedTeacherLogin);
 }
 
 export async function writeSelectedTeacherLogin(value: string | null): Promise<void> {
   if (!value) {
-    await storage.removeItem(STORAGE_KEYS.selectedTeacherLogin);
+    await AsyncStorage.removeItem(STORAGE_KEYS.selectedTeacherLogin);
     return;
   }
 
-  await storage.setItem(STORAGE_KEYS.selectedTeacherLogin, value);
+  await AsyncStorage.setItem(STORAGE_KEYS.selectedTeacherLogin, value);
 }

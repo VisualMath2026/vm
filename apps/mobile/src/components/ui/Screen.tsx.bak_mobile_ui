@@ -5,8 +5,7 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  View,
-  useWindowDimensions
+  View
 } from "react-native";
 
 import type { AppTheme } from "../../theme";
@@ -22,8 +21,7 @@ export function Screen({
   theme,
   scrollable = true
 }: ScreenProps) {
-  const { width } = useWindowDimensions();
-  const styles = createStyles(theme, width);
+  const styles = createStyles(theme);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -49,13 +47,7 @@ export function Screen({
   );
 }
 
-function createStyles(theme: AppTheme, width: number) {
-  const horizontalPadding =
-    width < 480 ? theme.spacing.sm : width < 900 ? theme.spacing.md : theme.spacing.lg;
-
-  const verticalPadding =
-    width < 480 ? theme.spacing.md : theme.spacing.lg;
-
+function createStyles(theme: AppTheme) {
   return StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -66,17 +58,15 @@ function createStyles(theme: AppTheme, width: number) {
     },
     scrollContent: {
       flexGrow: 1,
-      paddingHorizontal: horizontalPadding,
-      paddingVertical: verticalPadding
+      padding: theme.spacing.lg
     },
     content: {
       flex: 1,
-      paddingHorizontal: horizontalPadding,
-      paddingVertical: verticalPadding
+      padding: theme.spacing.lg
     },
     inner: {
       width: "100%",
-      maxWidth: width < 900 ? undefined : 1240,
+      maxWidth: 1240,
       alignSelf: "center"
     }
   });

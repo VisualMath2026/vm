@@ -1,4 +1,4 @@
-﻿import { createAsyncStorage } from "@react-native-async-storage/async-storage";
+﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type HomeworkItem = {
   id: string;
@@ -26,15 +26,13 @@ export type HomeworkSubmissionItem = {
   teacherLogin?: string;
 };
 
-const storage = createAsyncStorage("vmHomework_v1");
-
 const STORAGE_KEYS = {
-  homeworks: "homeworks_v1",
-  submissions: "homeworkSubmissions_v1"
+  homeworks: "vmHomework_v1:homeworks_v1",
+  submissions: "vmHomework_v1:homeworkSubmissions_v1"
 } as const;
 
 async function readJson<T>(key: string): Promise<T | null> {
-  const value = await storage.getItem(key);
+  const value = await AsyncStorage.getItem(key);
 
   if (!value) {
     return null;
@@ -48,7 +46,7 @@ async function readJson<T>(key: string): Promise<T | null> {
 }
 
 async function writeJson<T>(key: string, value: T): Promise<void> {
-  await storage.setItem(key, JSON.stringify(value));
+  await AsyncStorage.setItem(key, JSON.stringify(value));
 }
 
 export async function readHomeworks(): Promise<HomeworkItem[] | null> {

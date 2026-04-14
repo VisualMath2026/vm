@@ -1,16 +1,7 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions
-} from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppButton } from "../components/ui/AppButton";
 import { Screen } from "../components/ui/Screen";
-import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { SectionCard } from "../components/ui/SectionCard";
 import type { AppTheme } from "../theme";
 
@@ -111,8 +102,7 @@ function writeSolverHistory(items: SolverHistoryItem[]) {
 }
 
 export function SolverScreen({ theme, onBack }: SolverScreenProps) {
-  const { width } = useWindowDimensions();
-  const styles = createStyles(theme, width);
+  const styles = createStyles(theme);
 
   const [mode, setMode] = useState<SolverMode>("linear");
   const [inequalityOperator, setInequalityOperator] = useState<InequalityOperator>(">");
@@ -174,7 +164,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
     }
 
     if (mode === "system") {
-      return "Пример: 2x + y = 5, x - y = 1";
+      return "Пример: 2x + y = 5,  x - y = 1";
     }
 
     return "Пример: 2x - 4 > 0";
@@ -535,106 +525,202 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
     solveInequality();
   }
 
-  const allowMinusKeyboard = Platform.OS === "ios" ? "numbers-and-punctuation" : "default";
-
   return (
     <Screen theme={theme}>
-      <ScreenHeader
-        theme={theme}
-        title="Решатель"
-        subtitle="Компактный математический помощник с пошаговым объяснением. На Android минус теперь вводится обычной клавиатурой."
-      />
+      <Text style={styles.title}>Решатель</Text>
+      <Text style={styles.subtitle}>Решение уравнений и неравенств с пошаговым объяснением.</Text>
 
-      <View style={styles.heroCard}>
-        <Text style={styles.heroEyebrow}>Math tools</Text>
-        <Text style={styles.heroTitle}>{modeTitle}</Text>
-        <Text style={styles.heroFormula}>{modeFormula}</Text>
-        <Text style={styles.heroText}>{modeExample}</Text>
+      <SectionCard title="Как пользоваться" subtitle="Короткая инструкция" theme={theme}>
+        <Text style={styles.stepText}>1. Выберите тип задачи.</Text>
+        <Text style={styles.stepText}>2. Введите коэффициенты.</Text>
+        <Text style={styles.stepText}>3. Нажмите «Решить» или «Подставить пример».</Text>
+        <Text style={styles.stepText}>4. Посмотрите ответ и шаги решения.</Text>
+      </SectionCard>
 
-        <View style={styles.heroActions}>
-          <AppButton label="Подставить пример" onPress={fillExample} theme={theme} variant="secondary" fullWidth={false} />
-          <AppButton label="Очистить" onPress={resetFields} theme={theme} variant="ghost" fullWidth={false} />
-        </View>
-      </View>
-
-      <SectionCard title="Режим" subtitle="Выбери тип задачи" theme={theme}>
-        <View style={styles.modeGrid}>
-          <ModeChip
-            theme={theme}
+      <SectionCard title="Выбор режима" subtitle="Выберите тип задачи" theme={theme}>
+        <View style={styles.modeItem}>
+          <AppButton
             label="Линейное"
-            isActive={mode === "linear"}
             onPress={() => {
               setMode("linear");
               resetFields();
             }}
-          />
-          <ModeChip
             theme={theme}
+            variant={mode === "linear" ? undefined : "secondary"}
+          />
+        </View>
+
+        <View style={styles.modeItem}>
+          <AppButton
             label="Квадратное"
-            isActive={mode === "quadratic"}
             onPress={() => {
               setMode("quadratic");
               resetFields();
             }}
-          />
-          <ModeChip
             theme={theme}
+            variant={mode === "quadratic" ? undefined : "secondary"}
+          />
+        </View>
+
+        <View style={styles.modeItem}>
+          <AppButton
             label="Система 2x2"
-            isActive={mode === "system"}
             onPress={() => {
               setMode("system");
               resetFields();
             }}
-          />
-          <ModeChip
             theme={theme}
+            variant={mode === "system" ? undefined : "secondary"}
+          />
+        </View>
+
+        <View style={styles.modeItem}>
+          <AppButton
             label="Неравенство"
-            isActive={mode === "inequality"}
             onPress={() => {
               setMode("inequality");
               resetFields();
             }}
+            theme={theme}
+            variant={mode === "inequality" ? undefined : "secondary"}
           />
         </View>
       </SectionCard>
 
+      <SectionCard title={modeTitle} subtitle="Формула и пример" theme={theme}>
+        <Text style={styles.resultTitle}>{modeFormula}</Text>
+        <Text style={styles.stepText}>{modeExample}</Text>
+        <View style={styles.buttonGroup}>
+          <AppButton label="Подставить пример" onPress={fillExample} theme={theme} variant="secondary" />
+        </View>
+      </SectionCard>
+
       {mode === "inequality" ? (
-        <SectionCard title="Знак неравенства" subtitle="Выбери знак" theme={theme}>
-          <View style={styles.modeGrid}>
-            <ModeChip theme={theme} label=">" isActive={inequalityOperator === ">"} onPress={() => setInequalityOperator(">")} />
-            <ModeChip theme={theme} label=">=" isActive={inequalityOperator === ">="} onPress={() => setInequalityOperator(">=")} />
-            <ModeChip theme={theme} label="<" isActive={inequalityOperator === "<"} onPress={() => setInequalityOperator("<")} />
-            <ModeChip theme={theme} label="<=" isActive={inequalityOperator === "<="} onPress={() => setInequalityOperator("<=")} />
+        <SectionCard title="Знак неравенства" subtitle="Выберите знак" theme={theme}>
+          <View style={styles.operatorRow}>
+            <View style={styles.operatorItem}>
+              <AppButton
+                label=">"
+                onPress={() => setInequalityOperator(">")}
+                theme={theme}
+                variant={inequalityOperator === ">" ? undefined : "secondary"}
+              />
+            </View>
+            <View style={styles.operatorItem}>
+              <AppButton
+                label=">="
+                onPress={() => setInequalityOperator(">=")}
+                theme={theme}
+                variant={inequalityOperator === ">=" ? undefined : "secondary"}
+              />
+            </View>
+            <View style={styles.operatorItem}>
+              <AppButton
+                label="<"
+                onPress={() => setInequalityOperator("<")}
+                theme={theme}
+                variant={inequalityOperator === "<" ? undefined : "secondary"}
+              />
+            </View>
+            <View style={styles.operatorItem}>
+              <AppButton
+                label="<="
+                onPress={() => setInequalityOperator("<=")}
+                theme={theme}
+                variant={inequalityOperator === "<=" ? undefined : "secondary"}
+              />
+            </View>
           </View>
         </SectionCard>
       ) : null}
 
-      <SectionCard
-        title="Коэффициенты"
-        subtitle="Можно вводить отрицательные числа, например -5 или -1.5."
-        theme={theme}
-      >
-        <View style={styles.inputGrid}>
-          <CoefficientInput theme={theme} label="a" value={a} onChangeText={setA} keyboardType={allowMinusKeyboard} />
-          <CoefficientInput theme={theme} label="b" value={b} onChangeText={setB} keyboardType={allowMinusKeyboard} />
-          {(mode === "quadratic" || mode === "system") ? (
-            <CoefficientInput theme={theme} label="c" value={c} onChangeText={setC} keyboardType={allowMinusKeyboard} />
-          ) : null}
-          {mode === "system" ? (
-            <>
-              <CoefficientInput theme={theme} label="d" value={d} onChangeText={setD} keyboardType={allowMinusKeyboard} />
-              <CoefficientInput theme={theme} label="e" value={e} onChangeText={setE} keyboardType={allowMinusKeyboard} />
-              <CoefficientInput theme={theme} label="f" value={f} onChangeText={setF} keyboardType={allowMinusKeyboard} />
-            </>
-          ) : null}
+      <SectionCard title={modeTitle} subtitle="Введите коэффициенты" theme={theme}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>a</Text>
+          <TextInput
+            value={a}
+            onChangeText={setA}
+            style={styles.input}
+            placeholder="Введите a"
+            placeholderTextColor={theme.colors.textSecondary}
+            keyboardType="numeric"
+          />
         </View>
 
-        <View style={styles.solveButtonWrap}>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>b</Text>
+          <TextInput
+            value={b}
+            onChangeText={setB}
+            style={styles.input}
+            placeholder="Введите b"
+            placeholderTextColor={theme.colors.textSecondary}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>c</Text>
+          <TextInput
+            value={c}
+            onChangeText={setC}
+            style={styles.input}
+            placeholder="Введите c"
+            placeholderTextColor={theme.colors.textSecondary}
+            keyboardType="numeric"
+          />
+        </View>
+
+        {mode === "system" ? (
+          <>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>d</Text>
+              <TextInput
+                value={d}
+                onChangeText={setD}
+                style={styles.input}
+                placeholder="Введите d"
+                placeholderTextColor={theme.colors.textSecondary}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>e</Text>
+              <TextInput
+                value={e}
+                onChangeText={setE}
+                style={styles.input}
+                placeholder="Введите e"
+                placeholderTextColor={theme.colors.textSecondary}
+                keyboardType="numeric"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>f</Text>
+              <TextInput
+                value={f}
+                onChangeText={setF}
+                style={styles.input}
+                placeholder="Введите f"
+                placeholderTextColor={theme.colors.textSecondary}
+                keyboardType="numeric"
+              />
+            </View>
+          </>
+        ) : null}
+
+        <View style={styles.buttonGroup}>
           <AppButton label="Решить" onPress={handleSolve} theme={theme} />
+        </View>
+
+        <View style={styles.buttonGroup}>
+          <AppButton label="Очистить" onPress={resetFields} theme={theme} variant="secondary" />
         </View>
       </SectionCard>
 
-      <SectionCard title="Ответ" subtitle="Результат и шаги решения" theme={theme}>
+      <SectionCard title="Ответ" subtitle="Результат вычисления" theme={theme}>
         <Text style={styles.resultTitle}>{resultTitle}</Text>
         {steps.map((step, index) => (
           <Text key={`${step}-${index}`} style={styles.stepText}>
@@ -660,7 +746,7 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
               </Pressable>
             ))}
 
-            <View style={styles.solveButtonWrap}>
+            <View style={styles.buttonGroup}>
               <AppButton
                 label="Очистить историю"
                 onPress={clearHistory}
@@ -672,179 +758,67 @@ export function SolverScreen({ theme, onBack }: SolverScreenProps) {
         )}
       </SectionCard>
 
-      <AppButton label="Назад в каталог" onPress={onBack} theme={theme} variant="secondary" />
+      <View style={styles.buttonGroup}>
+        <AppButton label="Назад в каталог" onPress={onBack} theme={theme} variant="secondary" />
+      </View>
     </Screen>
   );
 }
 
-type ModeChipProps = {
-  theme: AppTheme;
-  label: string;
-  isActive: boolean;
-  onPress: () => void;
-};
-
-function ModeChip({ theme, label, isActive, onPress }: ModeChipProps) {
-  const styles = createModeChipStyles(theme, isActive);
-
-  return (
-    <Pressable onPress={onPress} style={styles.chip}>
-      <Text style={styles.label}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function createModeChipStyles(theme: AppTheme, isActive: boolean) {
+function createStyles(theme: AppTheme) {
   return StyleSheet.create({
-    chip: {
-      flexBasis: 140,
-      flexGrow: 1,
-      minHeight: 44,
-      paddingHorizontal: theme.spacing.md,
-      borderRadius: theme.radius.md,
-      borderWidth: 1,
-      borderColor: isActive ? theme.colors.primary : theme.colors.border,
-      backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface,
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: theme.spacing.xs,
+    title: {
+      fontSize: theme.typography.screenTitle,
+      fontWeight: "800",
+      color: theme.colors.text,
       marginBottom: theme.spacing.xs
+    },
+    subtitle: {
+      fontSize: theme.typography.body,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.lg
+    },
+    modeItem: {
+      marginBottom: theme.spacing.sm
+    },
+    operatorRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: theme.spacing.sm
+    },
+    operatorItem: {
+      minWidth: 72
+    },
+    inputGroup: {
+      marginBottom: theme.spacing.md
     },
     label: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
-      color: isActive ? theme.colors.primary : theme.colors.text
-    }
-  });
-}
-
-type CoefficientInputProps = {
-  theme: AppTheme;
-  label: string;
-  value: string;
-  onChangeText: (value: string) => void;
-  keyboardType: "default" | "numbers-and-punctuation";
-};
-
-function CoefficientInput({
-  theme,
-  label,
-  value,
-  onChangeText,
-  keyboardType
-}: CoefficientInputProps) {
-  const styles = createInputStyles(theme);
-
-  return (
-    <View style={styles.wrapper}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        style={styles.input}
-        placeholder={`Например: -2`}
-        placeholderTextColor={theme.colors.textSecondary}
-        keyboardType={keyboardType}
-        autoCorrect={false}
-        autoCapitalize="none"
-      />
-    </View>
-  );
-}
-
-function createInputStyles(theme: AppTheme) {
-  return StyleSheet.create({
-    wrapper: {
-      flexBasis: 130,
-      flexGrow: 1,
-      marginRight: theme.spacing.xs,
-      marginBottom: theme.spacing.sm
-    },
-    label: {
-      fontSize: theme.typography.caption,
-      color: theme.colors.textSecondary,
+      color: theme.colors.text,
       marginBottom: theme.spacing.xs,
-      fontWeight: "700"
+      fontWeight: "600"
     },
     input: {
-      minHeight: 48,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.input,
       color: theme.colors.text,
       borderRadius: theme.radius.md,
       paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm,
       fontSize: theme.typography.body
-    }
-  });
-}
-
-function createStyles(theme: AppTheme, width: number) {
-  const isPhone = width < 520;
-
-  return StyleSheet.create({
-    heroCard: {
-      borderRadius: theme.radius.lg,
-      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      marginBottom: theme.spacing.lg,
-      ...theme.shadow.md
     },
-    heroEyebrow: {
-      fontSize: theme.typography.caption,
-      fontWeight: "800",
-      color: theme.colors.primary,
-      marginBottom: theme.spacing.sm,
-      textTransform: "uppercase"
-    },
-    heroTitle: {
-      fontSize: isPhone ? 24 : theme.typography.title,
-      lineHeight: isPhone ? 30 : theme.typography.title + 4,
-      fontWeight: "900",
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs
-    },
-    heroFormula: {
-      fontSize: theme.typography.sectionTitle,
-      fontWeight: "800",
-      color: theme.colors.text,
-      marginBottom: theme.spacing.sm
-    },
-    heroText: {
-      fontSize: theme.typography.body,
-      lineHeight: 22,
-      color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.md
-    },
-    heroActions: {
-      flexDirection: "row",
-      flexWrap: "wrap"
-    },
-    modeGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginRight: -theme.spacing.xs
-    },
-    inputGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginRight: -theme.spacing.xs
-    },
-    solveButtonWrap: {
+    buttonGroup: {
       marginTop: theme.spacing.sm
     },
     resultTitle: {
       fontSize: theme.typography.body,
-      lineHeight: 22,
       color: theme.colors.text,
-      fontWeight: "800",
+      fontWeight: "700",
       marginBottom: theme.spacing.sm
     },
     stepText: {
       fontSize: theme.typography.body,
-      lineHeight: 22,
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -859,14 +833,13 @@ function createStyles(theme: AppTheme, width: number) {
     historyExpression: {
       fontSize: theme.typography.body,
       color: theme.colors.text,
-      fontWeight: "800",
+      fontWeight: "700",
       marginBottom: theme.spacing.xs
     },
     historyResult: {
       fontSize: theme.typography.body,
       color: theme.colors.primary,
-      marginBottom: theme.spacing.xs,
-      fontWeight: "700"
+      marginBottom: theme.spacing.xs
     },
     historyMeta: {
       fontSize: theme.typography.caption,

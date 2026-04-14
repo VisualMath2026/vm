@@ -1,4 +1,4 @@
-﻿import { createAsyncStorage } from "@react-native-async-storage/async-storage";
+﻿import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type MeetingItem = {
   id: string;
@@ -13,11 +13,10 @@ export type MeetingItem = {
   teacherLogin?: string;
 };
 
-const storage = createAsyncStorage("vmMeetings_v1");
-const STORAGE_KEY = "meetings_v1";
+const STORAGE_KEY = "vmMeetings_v1:meetings_v1";
 
 async function readJson<T>(key: string): Promise<T | null> {
-  const value = await storage.getItem(key);
+  const value = await AsyncStorage.getItem(key);
 
   if (!value) {
     return null;
@@ -31,7 +30,7 @@ async function readJson<T>(key: string): Promise<T | null> {
 }
 
 async function writeJson<T>(key: string, value: T): Promise<void> {
-  await storage.setItem(key, JSON.stringify(value));
+  await AsyncStorage.setItem(key, JSON.stringify(value));
 }
 
 export async function readMeetings(): Promise<MeetingItem[] | null> {

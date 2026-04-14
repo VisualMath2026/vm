@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+﻿import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../components/ui/AppButton";
@@ -10,8 +10,6 @@ import { StatusPill } from "../components/ui/StatusPill";
 import type { HomeworkItem, HomeworkSubmissionItem } from "../storage/homeworkStorage";
 import type { AppTheme } from "../theme";
 import { fixText } from "../utils/fixText";
-import type { TestingRunResult } from "./TestingScreen";
-import type { TestingSubmission } from "../storage/testingStorage";
 
 type GradesScreenProps = {
   theme: AppTheme;
@@ -20,8 +18,6 @@ type GradesScreenProps = {
   userName: string;
   homeworks: HomeworkItem[];
   submissions: HomeworkSubmissionItem[];
-  testingResults: TestingRunResult[];
-  testingSubmissions: TestingSubmission[];
   onGradeSubmission: (submissionId: string, score: number | null, comment: string) => void;
 };
 
@@ -44,8 +40,6 @@ export function GradesScreen({
   userName,
   homeworks,
   submissions,
-  testingResults,
-  testingSubmissions,
   onGradeSubmission
 }: GradesScreenProps) {
   const styles = createStyles(theme);
@@ -103,15 +97,6 @@ export function GradesScreen({
 
   const checkedTeacherRows = teacherRows.filter((row) => row.checkedSubmissions > 0).length;
 
-  const testingAverage = useMemo(() => {
-    if (testingResults.length === 0) {
-      return null;
-    }
-
-    const total = testingResults.reduce((sum, item) => sum + item.percent, 0);
-    return total / testingResults.length;
-  }, [testingResults]);
-
   function handleSaveGrade(submission: HomeworkSubmissionItem, homework: HomeworkItem) {
     const rawScore = (scoreDrafts[submission.id] ?? (submission.score !== null ? String(submission.score) : "")).trim();
     const rawComment = (commentDrafts[submission.id] ?? submission.teacherComment ?? "").trim();
@@ -138,12 +123,8 @@ export function GradesScreen({
     <Screen theme={theme}>
       <ScreenHeader
         theme={theme}
-        title="Итоги"
-        subtitle={
-          isTeacher
-            ? "Сводка по домашним заданиям и отдельный раздел «Итоги по тестированию»."
-            : "Все оценки, комментарии и статусы проверки домашних заданий."
-        }
+        title="Итоги по домашним заданиям"
+        subtitle={isTeacher ? "Сводка и выставление оценок по домашним работам." : "Все оценки, комментарии и статусы проверки домашних заданий."}
         rightSlot={
           <View style={styles.headerChip}>
             <Text style={styles.headerChipText}>
@@ -157,11 +138,11 @@ export function GradesScreen({
         <View style={styles.heroLeft}>
           <Text style={styles.heroEyebrow}>Результаты</Text>
           <Text style={styles.heroTitle}>
-            {isTeacher ? "Журнал итогов" : fixText(userName || userLogin)}
+            {isTeacher ? "Журнал оценок по ДЗ" : fixText(userName || userLogin)}
           </Text>
           <Text style={styles.heroSubtitle}>
             {isTeacher
-              ? "Здесь собраны результаты по домашним заданиям и сохранённые итоги по тестированию."
+              ? "Здесь можно просматривать сдачи, выставлять баллы и добавлять комментарии."
               : "Здесь отображаются статусы сдачи, выставленные оценки и комментарии преподавателя."}
           </Text>
           {errorText ? <Text style={styles.errorText}>{fixText(errorText)}</Text> : null}
@@ -171,8 +152,8 @@ export function GradesScreen({
           {isTeacher ? (
             <>
               <MiniStatCard theme={theme} value={String(teacherRows.length)} label="Заданий" />
-              <MiniStatCard theme={theme} value={String(submissions.length)} label="Сдач" />
-              <MiniStatCard theme={theme} value={String(testingResults.length)} label="Тестов" />
+              <MiniStatCard theme={theme} value={String(submissions.length)} label="Всего сдач" />
+              <MiniStatCard theme={theme} value={String(checkedTeacherRows)} label="Есть оценки" />
             </>
           ) : (
             <>
@@ -189,213 +170,122 @@ export function GradesScreen({
       </View>
 
       {isTeacher ? (
-        <>
-          <SectionCard
-            theme={theme}
-            title="Сводка преподавателя"
-            subtitle="По каждому домашнему заданию можно сразу выставить оценку."
-          >
-            {teacherRows.length === 0 ? (
-              <Text style={styles.emptyText}>Пока нет данных по домашним заданиям.</Text>
-            ) : (
-              <View style={styles.cardList}>
-                {teacherRows.map((row) => (
-                  <View key={row.homework.id} style={styles.resultCard}>
-                    <View style={styles.resultTop}>
-                      <View style={styles.resultTextWrap}>
-                        <Text style={styles.resultTitle}>{fixText(row.homework.title)}</Text>
-                        <Text style={styles.resultMeta}>
-                          {fixText(`Дедлайн: ${formatDateTime(row.homework.dueAt)} • Макс. балл: ${row.homework.maxScore}`)}
-                        </Text>
-                      </View>
-
-                      <StatusPill
-                        theme={theme}
-                        label={row.checkedSubmissions > 0 ? "Есть проверки" : "Ожидает"}
-                        tone={row.checkedSubmissions > 0 ? "success" : "warning"}
-                      />
+        <SectionCard
+          theme={theme}
+          title="Сводка преподавателя"
+          subtitle="По каждому заданию можно сразу выставить оценку."
+        >
+          {teacherRows.length === 0 ? (
+            <Text style={styles.emptyText}>Пока нет данных по домашним заданиям.</Text>
+          ) : (
+            <View style={styles.cardList}>
+              {teacherRows.map((row) => (
+                <View key={row.homework.id} style={styles.resultCard}>
+                  <View style={styles.resultTop}>
+                    <View style={styles.resultTextWrap}>
+                      <Text style={styles.resultTitle}>{fixText(row.homework.title)}</Text>
+                      <Text style={styles.resultMeta}>
+                        {fixText(`Дедлайн: ${formatDateTime(row.homework.dueAt)} • Макс. балл: ${row.homework.maxScore}`)}
+                      </Text>
                     </View>
 
-                    <View style={styles.infoGrid}>
-                      <InfoTile theme={theme} label="Сдач" value={String(row.relatedSubmissions.length)} />
-                      <InfoTile theme={theme} label="Проверено" value={String(row.checkedSubmissions)} />
-                      <InfoTile
-                        theme={theme}
-                        label="Средний балл"
-                        value={row.avgScore !== null ? row.avgScore.toFixed(1) : "—"}
-                      />
-                      <InfoTile theme={theme} label="Макс. балл" value={String(row.homework.maxScore)} />
-                    </View>
+                    <StatusPill
+                      theme={theme}
+                      label={row.checkedSubmissions > 0 ? "Есть проверки" : "Ожидает"}
+                      tone={row.checkedSubmissions > 0 ? "success" : "warning"}
+                    />
+                  </View>
 
-                    {row.relatedSubmissions.length === 0 ? (
-                      <Text style={styles.emptyText}>По этому заданию пока нет сдач.</Text>
-                    ) : (
-                      row.relatedSubmissions.map((submission) => {
-                        const scoreValue =
-                          scoreDrafts[submission.id] ??
-                          (submission.score !== null ? String(submission.score) : "");
+                  <View style={styles.infoGrid}>
+                    <InfoTile theme={theme} label="Сдач" value={String(row.relatedSubmissions.length)} />
+                    <InfoTile theme={theme} label="Проверено" value={String(row.checkedSubmissions)} />
+                    <InfoTile
+                      theme={theme}
+                      label="Средний балл"
+                      value={row.avgScore !== null ? row.avgScore.toFixed(1) : "—"}
+                    />
+                    <InfoTile theme={theme} label="Макс. балл" value={String(row.homework.maxScore)} />
+                  </View>
 
-                        const commentValue =
-                          commentDrafts[submission.id] ??
-                          submission.teacherComment ??
-                          "";
+                  {row.relatedSubmissions.length === 0 ? (
+                    <Text style={styles.emptyText}>По этому заданию пока нет сдач.</Text>
+                  ) : (
+                    row.relatedSubmissions.map((submission) => {
+                      const scoreValue =
+                        scoreDrafts[submission.id] ??
+                        (submission.score !== null ? String(submission.score) : "");
 
-                        return (
-                          <View key={submission.id} style={styles.submissionCard}>
-                            <View style={styles.submissionTop}>
-                              <View style={styles.submissionTextWrap}>
-                                <Text style={styles.submissionTitle}>{fixText(submission.studentName)}</Text>
-                                <Text style={styles.submissionMeta}>{fixText(`Логин: ${submission.studentLogin}`)}</Text>
-                                <Text style={styles.submissionMeta}>{fixText(`Файл: ${submission.fileName}`)}</Text>
-                                <Text style={styles.submissionMeta}>{fixText(`Сдано: ${formatDateTime(submission.submittedAt)}`)}</Text>
-                              </View>
+                      const commentValue =
+                        commentDrafts[submission.id] ??
+                        submission.teacherComment ??
+                        "";
 
-                              <StatusPill
+                      return (
+                        <View key={submission.id} style={styles.submissionCard}>
+                          <View style={styles.submissionTop}>
+                            <View style={styles.submissionTextWrap}>
+                              <Text style={styles.submissionTitle}>{fixText(submission.studentName)}</Text>
+                              <Text style={styles.submissionMeta}>{fixText(`Логин: ${submission.studentLogin}`)}</Text>
+                              <Text style={styles.submissionMeta}>{fixText(`Файл: ${submission.fileName}`)}</Text>
+                              <Text style={styles.submissionMeta}>{fixText(`Сдано: ${formatDateTime(submission.submittedAt)}`)}</Text>
+                            </View>
+
+                            <StatusPill
+                              theme={theme}
+                              label={submission.score !== null ? "Проверено" : "Ожидает проверки"}
+                              tone={submission.score !== null ? "success" : "info"}
+                            />
+                          </View>
+
+                          <View style={styles.inputGrid}>
+                            <View style={styles.inputCol}>
+                              <AppInput
+                                label="Оценка"
                                 theme={theme}
-                                label={submission.score !== null ? "Проверено" : "Ожидает проверки"}
-                                tone={submission.score !== null ? "success" : "info"}
+                                value={scoreValue}
+                                onChangeText={(value) =>
+                                  setScoreDrafts((current) => ({
+                                    ...current,
+                                    [submission.id]: value
+                                  }))
+                                }
+                                placeholder={`0-${row.homework.maxScore}`}
+                                keyboardType="numeric"
                               />
                             </View>
 
-                            <View style={styles.inputGrid}>
-                              <View style={styles.inputCol}>
-                                <AppInput
-                                  label="Оценка"
-                                  theme={theme}
-                                  value={scoreValue}
-                                  onChangeText={(value) =>
-                                    setScoreDrafts((current) => ({
-                                      ...current,
-                                      [submission.id]: value
-                                    }))
-                                  }
-                                  placeholder={`0-${row.homework.maxScore}`}
-                                  keyboardType="numeric"
-                                />
-                              </View>
-
-                              <View style={styles.inputColWide}>
-                                <AppInput
-                                  label="Комментарий"
-                                  theme={theme}
-                                  value={commentValue}
-                                  onChangeText={(value) =>
-                                    setCommentDrafts((current) => ({
-                                      ...current,
-                                      [submission.id]: value
-                                    }))
-                                  }
-                                  placeholder="Комментарий преподавателя"
-                                />
-                              </View>
+                            <View style={styles.inputColWide}>
+                              <AppInput
+                                label="Комментарий"
+                                theme={theme}
+                                value={commentValue}
+                                onChangeText={(value) =>
+                                  setCommentDrafts((current) => ({
+                                    ...current,
+                                    [submission.id]: value
+                                  }))
+                                }
+                                placeholder="Комментарий преподавателя"
+                              />
                             </View>
-
-                            <AppButton
-                              label="Сохранить оценку"
-                              onPress={() => handleSaveGrade(submission, row.homework)}
-                              theme={theme}
-                              fullWidth={false}
-                              style={styles.inlineButton}
-                            />
-                          </View>
-                        );
-                      })
-                    )}
-                  </View>
-                ))}
-              </View>
-            )}
-          </SectionCard>
-
-          <SectionCard
-            theme={theme}
-            title="Итоги по тестированию"
-            subtitle="Сохранённые результаты экспресс-тестов преподавателя."
-          >
-            {testingResults.length === 0 ? (
-              <Text style={styles.emptyText}>Пока нет сохранённых результатов по тестированию.</Text>
-            ) : (
-              <>
-                <View style={styles.infoGrid}>
-                  <InfoTile theme={theme} label="Всего тестов" value={String(testingResults.length)} />
-                  <InfoTile
-                    theme={theme}
-                    label="Средний процент"
-                    value={testingAverage !== null ? `${testingAverage.toFixed(1)}%` : "—"}
-                  />
-                </View>
-
-                <View style={styles.cardList}>
-                  {testingResults.map((item) => {
-                    const relatedTestingSubmissions = item.sessionId
-                      ? testingSubmissions.filter((submission) => submission.sessionId === item.sessionId)
-                      : [];
-
-                    return (
-                      <View key={item.id} style={styles.resultCard}>
-                        <View style={styles.resultTop}>
-                          <View style={styles.resultTextWrap}>
-                            <Text style={styles.resultTitle}>{fixText(item.title)}</Text>
-                            <Text style={styles.resultMeta}>
-                              {fixText(`Дата: ${formatDateTime(item.createdAt)} • Длительность: ${item.durationMin} мин`)}
-                            </Text>
                           </View>
 
-                          <StatusPill
+                          <AppButton
+                            label="Сохранить оценку"
+                            onPress={() => handleSaveGrade(submission, row.homework)}
                             theme={theme}
-                            label={`${item.percent}%`}
-                            tone={item.percent >= 70 ? "success" : item.percent >= 40 ? "warning" : "neutral"}
+                            fullWidth={false}
+                            style={styles.inlineButton}
                           />
                         </View>
-
-                        <View style={styles.infoGrid}>
-                          <InfoTile theme={theme} label="Правильных" value={String(item.correctCount)} />
-                          <InfoTile theme={theme} label="Ошибок" value={String(item.wrongCount)} />
-                          <InfoTile theme={theme} label="Пропусков" value={String(item.skippedCount)} />
-                          <InfoTile theme={theme} label="Всего вопросов" value={String(item.totalQuestions)} />
-                        </View>
-
-                        <Text style={styles.teacherSubmissionsTitle}>Студенты и оценки</Text>
-
-                        {relatedTestingSubmissions.length === 0 ? (
-                          <Text style={styles.emptyText}>Пока нет сохранённых результатов студентов по этому тесту.</Text>
-                        ) : (
-                          relatedTestingSubmissions.map((submission) => (
-                            <View key={submission.id} style={styles.submissionCard}>
-                              <View style={styles.submissionTop}>
-                                <View style={styles.submissionTextWrap}>
-                                  <Text style={styles.submissionTitle}>{fixText(submission.studentName)}</Text>
-                                  <Text style={styles.submissionMeta}>
-                                    {fixText(`Логин: ${submission.studentLogin}`)}
-                                  </Text>
-                                  <Text style={styles.submissionMeta}>
-                                    {fixText(`Результат: ${submission.correctCount}/${submission.totalQuestions} (${submission.percent}%)`)}
-                                  </Text>
-                                  <Text style={styles.submissionMeta}>
-                                    {fixText(`Ошибок: ${submission.wrongCount} • Пропусков: ${submission.skippedCount}`)}
-                                  </Text>
-                                  <Text style={styles.submissionMeta}>
-                                    {fixText(`Отправлено: ${formatDateTime(submission.submittedAt)}`)}
-                                  </Text>
-                                </View>
-
-                                <StatusPill
-                                  theme={theme}
-                                  label={`${submission.percent}%`}
-                                  tone={submission.percent >= 70 ? "success" : submission.percent >= 40 ? "warning" : "neutral"}
-                                />
-                              </View>
-                            </View>
-                          ))
-                        )}
-                      </View>
-                    );
-                  })}
+                      );
+                    })
+                  )}
                 </View>
-              </>
-            )}
-          </SectionCard>
-        </>
+              ))}
+            </View>
+          )}
+        </SectionCard>
       ) : (
         <SectionCard
           theme={theme}
@@ -699,14 +589,7 @@ function createStyles(theme: AppTheme) {
       fontSize: theme.typography.body,
       lineHeight: 24,
       color: theme.colors.textSecondary
-    },    teacherSubmissionsTitle: {
-      fontSize: theme.typography.sectionTitle,
-      fontWeight: "900",
-      color: theme.colors.text,
-      marginTop: theme.spacing.md,
-      marginBottom: theme.spacing.md
     },
-
     submissionCard: {
       borderRadius: theme.radius.lg,
       padding: theme.spacing.md,

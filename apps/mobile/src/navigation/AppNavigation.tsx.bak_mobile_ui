@@ -4,8 +4,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  View,
-  useWindowDimensions
+  View
 } from "react-native";
 import type { LectureDetails, QuizBlock, QuizQuestion, TextBlock } from "@vm/shared";
 import { createMockSession, evaluateSubmission, type SessionData, type TaskResult, type TaskSubmission } from "../mocks/session";
@@ -14,7 +13,7 @@ import { mockLectures, type LectureItem } from "../mocks/lectures";
 import { mockUser, type UserProfile } from "../mocks/user";
 import { CatalogScreen } from "../screens/CatalogScreen";
 import { LectureDetailsScreen } from "../screens/LectureDetailsScreen";
-import { LoginScreen, type GoogleLoginPayload, type VkLoginPayload } from "../screens/LoginScreen";
+import { LoginScreen, type GoogleLoginPayload } from "../screens/LoginScreen";
 import { ProfileScreen } from "../screens/ProfileScreen";
 import { SessionScreen } from "../screens/SessionScreen";
 import { SolverScreen } from "../screens/SolverScreen";
@@ -23,17 +22,6 @@ import { PhotoMaterialsScreen, type PhotoMaterialItem } from "../screens/PhotoMa
 import { MeetingsScreen, type MeetingDraftInput } from "../screens/MeetingsScreen";
 import { HomeworkScreen, type HomeworkDraftInput, type HomeworkSubmissionDraftInput } from "../screens/HomeworkScreen";
 import { GradesScreen } from "../screens/GradesScreen";
-import { TestingScreen, type TestingRunResult } from "../screens/TestingScreen";
-import {
-  readActiveTestingSession,
-  readTestingSubmissions,
-  writeActiveTestingSession,
-  writeTestingSubmissions,
-  type ActiveTestingQuestion,
-  type ActiveTestingSession,
-  type TestingAnswerKey,
-  type TestingSubmission
-} from "../storage/testingStorage";
 import { TeacherBranchSelectScreen } from "../screens/TeacherBranchSelectScreen";
 import { LatexWorkspaceScreen } from "../screens/LatexWorkspaceScreen";
 import { TaskResultScreen } from "../screens/TaskResultScreen";
@@ -73,11 +61,6 @@ import {
   writeSelectedTeacherLogin,
   type TeacherBranch
 } from "../storage/teacherBranchesStorage";
-import {
-  findTeacherAccount,
-  registerStudentAccount,
-  validateStudentCredentials
-} from "../storage/localUsersStorage";
 import { fixText } from "../utils/fixText";
 import { authApi, catalogApi, quizApi, sessionApi, toUserMessage } from "../api/mobileApi";
 import {
@@ -103,13 +86,11 @@ type ScreenKey =
   | "meetings"
   | "homework"
   | "grades"
-  | "testing"
   | "teacherBranchSelect"
   | "latex"
   | "profile";
 
 type LoginRole = "student" | "teacher";
-type AuthMode = "login" | "register";
 type DemoDataMode = "online" | "offline" | "loading" | "error";
 
 function nextMode(currentMode: DemoDataMode): DemoDataMode {
@@ -676,9 +657,6 @@ export function AppNavigation() {
   const [teacherBranches, setTeacherBranches] = useState<TeacherBranch[]>([]);
   const [selectedTeacherLogin, setSelectedTeacherLogin] = useState<string | null>(null);
   const [latexDocument, setLatexDocument] = useState<LatexDocumentState>(readLatexDocument());
-  const [testingResults, setTestingResults] = useState<TestingRunResult[]>([]);
-  const [activeTestingSession, setActiveTestingSession] = useState<ActiveTestingSession | null>(null);
-  const [testingSubmissions, setTestingSubmissions] = useState<TestingSubmission[]>([]);
 
   const [currentSession, setCurrentSession] = useState<SessionData | null>(null);
   const [currentResult, setCurrentResult] = useState<TaskResult | null>(null);
@@ -690,22 +668,11 @@ export function AppNavigation() {
 
   const theme = useMemo(() => createAppTheme(themeMode), [themeMode]);
   const isTeacher = user.role === "teacher";
-  const { width } = useWindowDimensions();
-  const isCompactLayout = width < 820;
-  const isPhoneLayout = width < 520;
-  const headerTitleSize = isPhoneLayout ? 24 : isCompactLayout ? 26 : theme.typography.screenTitle;
-  const topBarPaddingX = isPhoneLayout ? theme.spacing.sm : theme.spacing.md;
-  const topBarPaddingTop = isPhoneLayout ? theme.spacing.sm : theme.spacing.md;
-  const menuPanelLeft = isPhoneLayout ? theme.spacing.sm : theme.spacing.md;
 
   const selectedTeacherBranch = useMemo(
     () => teacherBranches.find((branch) => branch.teacherLogin === selectedTeacherLogin) ?? null,
     [teacherBranches, selectedTeacherLogin]
   );
-
-  const roleBadgeLabel = isTeacher
-    ? "Преподаватель"
-    : selectedTeacherBranch?.teacherName || "Ветка";
 
   const scopedTeacherLogin = isTeacher ? user.login : selectedTeacherLogin;
 
@@ -797,33 +764,15 @@ export function AppNavigation() {
       : base.filter((submission) => submission.studentLogin === user.login);
   }, [homeworkSubmissions, isTeacher, scopedTeacherLogin, user.login]);
 
-  const visibleActiveTestingSession = useMemo(() => {
-    if (!activeTestingSession) {
-      return null;
+  useEffect(() => {
+    if (!isAuthenticated || !isTeacher) {
+      return;
     }
 
-    if (isTeacher) {
-      return activeTestingSession.teacherLogin === user.login ? activeTestingSession : null;
-    }
+    ensureTeacherBranch(user.login, user.fullName || user.login);
+    adoptTeacherContent(user.login);
+  }, [isAuthenticated, isTeacher, user.fullName, user.login]);
 
-    if (!selectedTeacherLogin) {
-      return null;
-    }
-
-    return activeTestingSession.teacherLogin === selectedTeacherLogin
-      ? activeTestingSession
-      : null;
-  }, [activeTestingSession, isTeacher, selectedTeacherLogin, user.login]);
-
-  const visibleTestingSubmissions = useMemo(() => {
-    if (!visibleActiveTestingSession) {
-      return [];
-    }
-
-    return testingSubmissions.filter(
-      (submission) => submission.sessionId === visibleActiveTestingSession.id
-    );
-  }, [testingSubmissions, visibleActiveTestingSession]);
   useEffect(() => {
     const savedDrafts = readDraftStorage();
 
@@ -868,9 +817,7 @@ export function AppNavigation() {
           storedHomeworks,
           storedHomeworkSubmissions,
           storedTeacherBranches,
-          storedSelectedTeacherLogin,
-          storedActiveTestingSession,
-          storedTestingSubmissions
+          storedSelectedTeacherLogin
         ] = await Promise.all([
           readCatalogSnapshot(),
           readLastLectureId(),
@@ -881,9 +828,7 @@ export function AppNavigation() {
           readHomeworks(),
           readHomeworkSubmissions(),
           readTeacherBranches(),
-          readSelectedTeacherLogin(),
-          readActiveTestingSession(),
-          readTestingSubmissions()
+          readSelectedTeacherLogin()
         ]);
 
         if (!isMounted) {
@@ -947,14 +892,6 @@ export function AppNavigation() {
 
         if (storedSelectedTeacherLogin) {
           setSelectedTeacherLogin(storedSelectedTeacherLogin);
-        }
-
-        if (storedActiveTestingSession) {
-          setActiveTestingSession(storedActiveTestingSession);
-        }
-
-        if (Array.isArray(storedTestingSubmissions) && storedTestingSubmissions.length > 0) {
-          setTestingSubmissions(storedTestingSubmissions);
         }
 
         if (storedAuthMeta?.userLogin) {
@@ -1100,55 +1037,6 @@ export function AppNavigation() {
     void writeSelectedTeacherLogin(selectedTeacherLogin);
   }, [selectedTeacherLogin, isHydrating]);
 
-  useEffect(() => {
-    if (isHydrating) {
-      return;
-    }
-
-    void writeActiveTestingSession(activeTestingSession);
-  }, [activeTestingSession, isHydrating]);
-
-  useEffect(() => {
-    if (isHydrating) {
-      return;
-    }
-
-    void writeTestingSubmissions(testingSubmissions);
-  }, [testingSubmissions, isHydrating]);
-
-  useEffect(() => {
-    if (!isAuthenticated || isHydrating) {
-      return;
-    }
-
-    let isMounted = true;
-
-    async function syncTestingState() {
-      const [storedSession, storedSubmissions] = await Promise.all([
-        readActiveTestingSession(),
-        readTestingSubmissions()
-      ]);
-
-      if (!isMounted) {
-        return;
-      }
-
-      setActiveTestingSession(storedSession);
-      setTestingSubmissions(Array.isArray(storedSubmissions) ? storedSubmissions : []);
-    }
-
-    void syncTestingState();
-
-    const timerId = setInterval(() => {
-      void syncTestingState();
-    }, 1500);
-
-    return () => {
-      isMounted = false;
-      clearInterval(timerId);
-    };
-  }, [isAuthenticated, isHydrating]);
-
   function ensureTeacherBranch(nextTeacherLogin: string, nextTeacherName: string) {
     setTeacherBranches((current) => {
       const existingIndex = current.findIndex((branch) => branch.teacherLogin === nextTeacherLogin);
@@ -1254,85 +1142,59 @@ export function AppNavigation() {
     }
   }
 
-  async function handleLogin(input: {
-    login: string;
-    password: string;
-    role: LoginRole;
-    mode: "login" | "register";
-    fullName?: string;
-  }): Promise<string | null> {
-    const safeLogin = input.login.trim().toLowerCase();
-    const safePassword = input.password.trim();
-
-    if (!safeLogin || !safePassword) {
-      return "Заполни логин и пароль.";
-    }
-
-    if (input.role === "teacher") {
-      if (input.mode === "register") {
-        return "Регистрация преподавателя отключена. Используй логин teacher и пароль teacher.";
-      }
-
-      const teacherAccount = findTeacherAccount(safeLogin, safePassword);
-
-      if (!teacherAccount) {
-        return "Неверный логин или пароль преподавателя.";
-      }
-
-      const nextUser: UserProfile = {
-        fullName: teacherAccount.fullName,
-        login: teacherAccount.login,
-        role: "teacher",
-        group: teacherAccount.group
-      };
-
-      await writeAuthMeta({
-        userLogin: nextUser.login,
-        role: "teacher",
-        fullName: nextUser.fullName,
-        group: nextUser.group
-      });
-
-      ensureTeacherBranch(nextUser.login, nextUser.fullName);
-      adoptTeacherContent(nextUser.login);
-
-      setUser(nextUser);
-      setIsAuthenticated(true);
-      setActiveScreen("teacherHome");
-
-      try {
-        await refreshCatalogFromApi(nextUser.login);
-      } catch {}
-
-      return null;
-    }
-
-    if (input.mode === "register") {
-      const registerResult = await registerStudentAccount({
-        login: safeLogin,
-        password: safePassword,
-        fullName: input.fullName?.trim() || safeLogin,
-        group: mockUser.group
-      });
-
-      if (!registerResult.ok) {
-        return registerResult.error;
-      }
-
-      return `REGISTRATION_SUCCESS::${registerResult.account.login}`;
-    }
-
-    const studentAccount = await validateStudentCredentials(safeLogin, safePassword);
-
-    if (!studentAccount) {
-      return "Студент с таким логином и паролем не найден. Сначала зарегистрируйся или проверь данные.";
+  async function handleLogin(
+    login: string,
+    password: string,
+    role: LoginRole
+  ): Promise<string | null> {
+    if (!login.trim() || !password.trim()) {
+      return "Р вЂ™Р Р†Р ВµР Т‘Р С‘РЎвЂљР Вµ Р В»Р С•Р С–Р С‘Р Р… Р С‘ Р С—Р В°РЎР‚Р С•Р В»РЎРЉ.";
     }
 
     const nextUser: UserProfile = {
-      fullName: studentAccount.fullName,
-      login: studentAccount.login,
+      fullName: role === "teacher" ? "Преподаватель VisualMath" : "Студент VisualMath",
+      login: login.trim(),
+      role,
+      group: mockUser.group
+    };
+
+    await writeAuthMeta({
+      userLogin: nextUser.login,
+      role,
+      fullName: nextUser.fullName,
+      group: nextUser.group
+    });
+
+    if (role === "teacher") {
+      ensureTeacherBranch(nextUser.login, nextUser.fullName);
+      adoptTeacherContent(nextUser.login);
+    }
+
+    setUser(nextUser);
+    setIsAuthenticated(true);
+    setActiveScreen(
+      role === "teacher"
+        ? "teacherHome"
+        : selectedTeacherLogin
+          ? "catalog"
+          : "teacherBranchSelect"
+    );
+
+    try {
+      await refreshCatalogFromApi(role === "teacher" ? nextUser.login : undefined);
+    } catch {}
+
+    return null;
+  }
+
+  async function handleGoogleLogin(payload: GoogleLoginPayload): Promise<string | null> {
+    const safeEmail = (payload.email ?? "").trim();
+    const safeName = (payload.name ?? payload.fullName ?? "").trim();
+    const nextUser: UserProfile = {
+      fullName: safeName || safeEmail || "Студент Google",
+      login: safeEmail || "google_user",
       role: "student",
-      group: studentAccount.group
+      group: mockUser.group
     };
 
     await writeAuthMeta({
@@ -1351,14 +1213,6 @@ export function AppNavigation() {
     } catch {}
 
     return null;
-  }
-
-  async function handleGoogleLogin(_payload: GoogleLoginPayload): Promise<string | null> {
-    return "Для реального входа через Google сначала добавь client IDs.";
-  }
-
-  async function handleVkLogin(_payload: VkLoginPayload): Promise<string | null> {
-    return "Для реального входа через VK сначала добавь VK APP ID и redirect URL.";
   }
 
   function resetStudentFlow() {
@@ -1894,125 +1748,8 @@ export function AppNavigation() {
     );
   }
 
-  function handleSaveTestingResult(result: TestingRunResult) {
-    setTestingResults((current) => [result, ...current].slice(0, 20));
-  }
-
-  function handleStartTestingSession(input: {
-    title: string;
-    durationMin: number;
-    questions: ActiveTestingQuestion[];
-  }) {
-    const nextSession: ActiveTestingSession = {
-      id: `active-testing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      teacherLogin: user.login,
-      title: input.title.trim(),
-      durationMin: input.durationMin,
-      startedAt: new Date().toISOString(),
-      questions: input.questions
-    };
-
-    setActiveTestingSession(nextSession);
-  }
-
-  function handleFinishTestingSession() {
-    if (!activeTestingSession || activeTestingSession.teacherLogin !== user.login) {
-      return;
-    }
-
-    const relatedSubmissions = testingSubmissions.filter(
-      (submission) => submission.sessionId === activeTestingSession.id
-    );
-
-    const totalQuestions = activeTestingSession.questions.length;
-    const avgCorrect =
-      relatedSubmissions.length > 0
-        ? relatedSubmissions.reduce((sum, item) => sum + item.correctCount, 0) / relatedSubmissions.length
-        : 0;
-    const avgWrong =
-      relatedSubmissions.length > 0
-        ? relatedSubmissions.reduce((sum, item) => sum + item.wrongCount, 0) / relatedSubmissions.length
-        : 0;
-    const avgSkipped =
-      relatedSubmissions.length > 0
-        ? relatedSubmissions.reduce((sum, item) => sum + item.skippedCount, 0) / relatedSubmissions.length
-        : 0;
-    const avgPercent =
-      relatedSubmissions.length > 0
-        ? relatedSubmissions.reduce((sum, item) => sum + item.percent, 0) / relatedSubmissions.length
-        : 0;
-
-    handleSaveTestingResult({
-      id: `testing-summary-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      sessionId: activeTestingSession.id,
-      title: `${activeTestingSession.title} — группа`,
-      createdAt: new Date().toISOString(),
-      durationMin: activeTestingSession.durationMin,
-      totalQuestions,
-      correctCount: Math.round(avgCorrect),
-      wrongCount: Math.round(avgWrong),
-      skippedCount: Math.round(avgSkipped),
-      percent: Math.round(avgPercent)
-    });
-
-    setActiveTestingSession(null);
-  }
-
-  function handleSubmitTestingAnswers(answers: Record<string, TestingAnswerKey>) {
-    if (isTeacher || !visibleActiveTestingSession) {
-      return;
-    }
-
-    const totalQuestions = visibleActiveTestingSession.questions.length;
-
-    let correctCount = 0;
-    let wrongCount = 0;
-    let skippedCount = 0;
-
-    for (const question of visibleActiveTestingSession.questions) {
-      const answer = answers[question.id];
-
-      if (!answer) {
-        skippedCount += 1;
-        continue;
-      }
-
-      if (answer === question.correctAnswerKey) {
-        correctCount += 1;
-      } else {
-        wrongCount += 1;
-      }
-    }
-
-    const percent =
-      totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0;
-
-    const nextSubmission: TestingSubmission = {
-      id: `testing-submission-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      sessionId: visibleActiveTestingSession.id,
-      teacherLogin: visibleActiveTestingSession.teacherLogin,
-      studentLogin: user.login,
-      studentName: fixText(user.fullName || user.login),
-      answers,
-      submittedAt: new Date().toISOString(),
-      correctCount,
-      wrongCount,
-      skippedCount,
-      totalQuestions,
-      percent
-    };
-
-    setTestingSubmissions((current) => [
-      nextSubmission,
-      ...current.filter(
-        (submission) =>
-          !(submission.sessionId === visibleActiveTestingSession.id && submission.studentLogin === user.login)
-      )
-    ]);
-  }
-
   function handleMenuNavigate(
-    screen: "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "testing" | "teacherBranchSelect" | "latex" | "profile"
+    screen: "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "teacherBranchSelect" | "latex" | "profile"
   ) {
     setIsMenuOpen(false);
 
@@ -2061,13 +1798,6 @@ export function AppNavigation() {
       resetStudentFlow();
       resetTeacherFlow();
       setActiveScreen("grades");
-      return;
-    }
-
-    if (screen === "testing") {
-      resetStudentFlow();
-      resetTeacherFlow();
-      setActiveScreen("testing");
       return;
     }
 
@@ -2130,7 +1860,7 @@ export function AppNavigation() {
   }
 
   if (!isAuthenticated) {
-    return <LoginScreen theme={theme} onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} onVkLogin={handleVkLogin} />;
+    return <LoginScreen theme={theme} onLogin={handleLogin} onGoogleLogin={handleGoogleLogin} />;
   }
 
   const lastOpenedLecture =
@@ -2151,9 +1881,9 @@ export function AppNavigation() {
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "space-between",
-          paddingHorizontal: topBarPaddingX,
-          paddingTop: topBarPaddingTop,
-          paddingBottom: isPhoneLayout ? theme.spacing.xs : theme.spacing.sm,
+          paddingHorizontal: theme.spacing.md,
+          paddingTop: theme.spacing.md,
+          paddingBottom: theme.spacing.sm,
           backgroundColor: theme.colors.surface,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border
@@ -2162,9 +1892,9 @@ export function AppNavigation() {
         <Pressable
           onPress={() => setIsMenuOpen((current) => !current)}
           style={{
-            width: isPhoneLayout ? 36 : 40,
-            height: isPhoneLayout ? 36 : 40,
-            borderRadius: isPhoneLayout ? 10 : 12,
+            width: 40,
+            height: 40,
+            borderRadius: 12,
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: theme.colors.surfaceMuted
@@ -2183,10 +1913,8 @@ export function AppNavigation() {
         </Pressable>
 
         <Text
-          numberOfLines={1}
           style={{
-            flexShrink: 1,
-            fontSize: headerTitleSize,
+            fontSize: theme.typography.screenTitle,
             fontWeight: "800",
             color: theme.colors.text
           }}
@@ -2196,9 +1924,8 @@ export function AppNavigation() {
 
         <View
           style={{
-            minHeight: isPhoneLayout ? 34 : 40,
-            maxWidth: isPhoneLayout ? 132 : 220,
-            paddingHorizontal: isPhoneLayout ? theme.spacing.sm : theme.spacing.md,
+            minHeight: 40,
+            paddingHorizontal: theme.spacing.md,
             borderRadius: theme.radius.pill,
             alignItems: "center",
             justifyContent: "center",
@@ -2208,14 +1935,13 @@ export function AppNavigation() {
           }}
         >
           <Text
-            numberOfLines={1}
             style={{
               fontSize: theme.typography.caption,
               fontWeight: "800",
               color: theme.colors.text
             }}
           >
-            {roleBadgeLabel}
+            {isTeacher ? "Преподаватель" : selectedTeacherBranch?.teacherName || "Выбор ветки"}
           </Text>
         </View>
       </View>
@@ -2224,18 +1950,15 @@ export function AppNavigation() {
         <View
           style={{
             position: "absolute",
-            top: isPhoneLayout ? 60 : 72,
-            left: menuPanelLeft,
-            right: isPhoneLayout ? theme.spacing.sm : undefined,
+            top: 72,
+            left: theme.spacing.md,
             zIndex: 50,
-            minWidth: isPhoneLayout ? undefined : 220,
-            maxWidth: isPhoneLayout ? undefined : 280,
-            maxHeight: isPhoneLayout ? 560 : undefined,
-            borderRadius: isPhoneLayout ? 16 : 18,
+            minWidth: 220,
+            borderRadius: 18,
             borderWidth: 1,
             borderColor: theme.colors.border,
             backgroundColor: theme.colors.surface,
-            padding: isPhoneLayout ? theme.spacing.xs : theme.spacing.sm,
+            padding: theme.spacing.sm,
             shadowColor: "#000000",
             shadowOpacity: 0.12,
             shadowRadius: 12,
@@ -2252,7 +1975,6 @@ export function AppNavigation() {
             { key: "meetings", label: "Миты" },
             { key: "homework", label: "ДЗ" },
             { key: "grades", label: "Итоги" },
-            { key: "testing", label: "Тестирование" },
             { key: "latex", label: "LaTeX" },
             { key: "solver", label: "Уравнения" }
           ].map((item) => (
@@ -2260,7 +1982,7 @@ export function AppNavigation() {
               key={item.key}
               onPress={() =>
                 handleMenuNavigate(
-                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "testing" | "teacherBranchSelect" | "latex" | "profile"
+                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "teacherBranchSelect" | "latex" | "profile"
                 )
               }
               style={{
@@ -2453,32 +2175,7 @@ export function AppNavigation() {
             userName={user.fullName || user.login}
             homeworks={visibleHomeworks}
             submissions={visibleHomeworkSubmissions}
-            testingResults={testingResults}
-            testingSubmissions={
-              isTeacher
-                ? testingSubmissions.filter((item) => item.teacherLogin === user.login)
-                : testingSubmissions.filter(
-                    (item) =>
-                      item.studentLogin === user.login &&
-                      item.teacherLogin === selectedTeacherLogin
-                  )
-            }
             onGradeSubmission={handleGradeHomeworkSubmission}
-          />
-        ) : null}
-
-        {activeScreen === "testing" ? (
-          <TestingScreen
-            theme={theme}
-            isTeacher={isTeacher}
-            userLogin={user.login}
-            userName={user.fullName || user.login}
-            activeSession={visibleActiveTestingSession}
-            submissions={visibleTestingSubmissions}
-            onStartSession={handleStartTestingSession}
-            onFinishSession={handleFinishTestingSession}
-            onSubmitStudentAnswers={handleSubmitTestingAnswers}
-            onOpenGrades={() => setActiveScreen("grades")}
           />
         ) : null}
 

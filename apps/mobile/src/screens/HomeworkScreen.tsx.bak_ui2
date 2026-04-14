@@ -83,14 +83,6 @@ export function HomeworkScreen({
     return submissions.filter((submission) => submission.score !== null).length;
   }, [submissions]);
 
-  const activeCount = useMemo(() => {
-    return sortedHomeworks.filter((homework) => Date.now() <= new Date(homework.dueAt).getTime()).length;
-  }, [sortedHomeworks]);
-
-  const submittedByMe = useMemo(() => {
-    return submissions.filter((submission) => submission.studentLogin === userLogin).length;
-  }, [submissions, userLogin]);
-
   function toggleFormat(format: string) {
     setAllowedFormats((current) =>
       current.includes(format)
@@ -250,24 +242,15 @@ export function HomeworkScreen({
           </Text>
           <Text style={styles.heroSubtitle}>
             {isTeacher
-              ? "Создавайте задания, ставьте дедлайны и проверяйте файлы студентов в одном месте."
-              : "Здесь видны активные задания, допустимые форматы и текущий статус каждой сдачи."}
+              ? "Создавайте задания, устанавливайте дедлайны и проверяйте загруженные файлы студентов."
+              : "Здесь можно увидеть активные задания, загрузить решение и посмотреть статус проверки."}
           </Text>
-          {error ? <Text style={styles.errorText}>{fixText(error)}</Text> : null}
         </View>
 
         <View style={styles.heroStats}>
           <MiniStatCard theme={theme} value={String(sortedHomeworks.length)} label="Всего заданий" />
-          <MiniStatCard
-            theme={theme}
-            value={String(isTeacher ? submissions.length : submittedByMe)}
-            label={isTeacher ? "Всего сдач" : "Моих сдач"}
-          />
-          <MiniStatCard
-            theme={theme}
-            value={String(isTeacher ? reviewedCount : activeCount)}
-            label={isTeacher ? "Проверено" : "Активно сейчас"}
-          />
+          <MiniStatCard theme={theme} value={String(submissions.length)} label="Сдач" />
+          <MiniStatCard theme={theme} value={String(reviewedCount)} label="Проверено" />
         </View>
       </View>
 
@@ -363,6 +346,8 @@ export function HomeworkScreen({
             })}
           </View>
 
+          {error ? <Text style={styles.errorText}>{fixText(error)}</Text> : null}
+
           <AppButton
             label="Создать задание"
             onPress={handleCreateHomework}
@@ -410,7 +395,7 @@ export function HomeworkScreen({
                     <InfoTile theme={theme} label="Форматы" value={homework.allowedFormats.join(", ").toUpperCase()} />
                     <InfoTile theme={theme} label="Создал" value={homework.createdBy} />
                     <InfoTile theme={theme} label="Сдач" value={String(relatedSubmissions.length)} />
-                    <InfoTile theme={theme} label="До дедлайна" value={buildDeadlineHint(homework.dueAt)} />
+                    <InfoTile theme={theme} label="Макс. балл" value={String(homework.maxScore)} />
                   </View>
 
                   {!isTeacher ? (
@@ -646,27 +631,6 @@ function formatDateTime(value: string): string {
   });
 }
 
-function buildDeadlineHint(value: string): string {
-  const deadlineTs = new Date(value).getTime();
-  const diffMin = Math.round((deadlineTs - Date.now()) / 60000);
-
-  if (diffMin < 0) {
-    return "Срок прошёл";
-  }
-
-  if (diffMin < 60) {
-    return `${diffMin} мин`;
-  }
-
-  const hours = Math.floor(diffMin / 60);
-  if (hours < 24) {
-    return `${hours} ч`;
-  }
-
-  const days = Math.floor(hours / 24);
-  return `${days} дн`;
-}
-
 function homeworkStatusLabel(
   homework: HomeworkItem,
   submission: HomeworkSubmissionItem | null
@@ -725,12 +689,13 @@ function createStyles(theme: AppTheme) {
     heroCard: {
       flexDirection: "row",
       flexWrap: "wrap",
-      borderRadius: theme.radius.lg,
+      borderRadius: theme.radius.xl,
       padding: theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.lg
+      marginBottom: theme.spacing.lg,
+      ...theme.shadow.lg
     },
     heroLeft: {
       flex: 1,
@@ -840,12 +805,13 @@ function createStyles(theme: AppTheme) {
       width: "100%"
     },
     homeworkCard: {
-      borderRadius: theme.radius.lg,
+      borderRadius: theme.radius.xl,
       padding: theme.spacing.lg,
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.surfaceElevated,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.md
+      marginBottom: theme.spacing.md,
+      ...theme.shadow.md
     },
     homeworkTop: {
       flexDirection: "row",
@@ -888,12 +854,12 @@ function createStyles(theme: AppTheme) {
       marginBottom: theme.spacing.sm,
       padding: theme.spacing.md,
       borderRadius: theme.radius.md,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surfaceMuted,
       borderWidth: 1,
       borderColor: theme.colors.border
     },
     infoTileLabel: {
-      fontSize: theme.typography.caption,
+      fontSize: theme.typography.helper,
       fontWeight: "700",
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.xs
@@ -914,9 +880,9 @@ function createStyles(theme: AppTheme) {
     },
     studentSubmissionBox: {
       marginTop: theme.spacing.md,
-      borderRadius: theme.radius.md,
+      borderRadius: theme.radius.lg,
       padding: theme.spacing.md,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surfaceMuted,
       borderWidth: 1,
       borderColor: theme.colors.border
     },
@@ -933,9 +899,9 @@ function createStyles(theme: AppTheme) {
       marginBottom: theme.spacing.md
     },
     submissionCard: {
-      borderRadius: theme.radius.md,
+      borderRadius: theme.radius.lg,
       padding: theme.spacing.md,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surfaceMuted,
       borderWidth: 1,
       borderColor: theme.colors.border,
       marginBottom: theme.spacing.md

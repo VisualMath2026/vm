@@ -1,96 +1,135 @@
-﻿import React, { useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useMemo, useState } from "react";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions
+} from "react-native";
 
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
 import { Screen } from "../components/ui/Screen";
 import type { AppTheme } from "../theme";
 
+export type LoginRole = "student" | "teacher";
+export type AuthMode = "login" | "register";
+
 export type GoogleLoginPayload = {
+  mode: AuthMode;
   email?: string;
   fullName?: string;
   name?: string;
 };
 
-type LoginRole = "student" | "teacher";
-type AuthMode = "login" | "register";
+export type VkLoginPayload = {
+  mode: AuthMode;
+  email?: string;
+  fullName?: string;
+  name?: string;
+  vkId?: string;
+};
 
 type LoginScreenProps = {
   theme: AppTheme;
-  onLogin: (login: string, password: string, role: LoginRole) => Promise<string | null>;
+  onLogin: (input: {
+    login: string;
+    password: string;
+    role: LoginRole;
+    mode: AuthMode;
+    fullName?: string;
+  }) => Promise<string | null>;
   onGoogleLogin: (payload: GoogleLoginPayload) => Promise<string | null>;
+  onVkLogin: (payload: VkLoginPayload) => Promise<string | null>;
 };
 
-export function LoginScreen({ theme, onLogin, onGoogleLogin }: LoginScreenProps) {
-  const styles = createStyles(theme);
+export function LoginScreen({
+  theme,
+  onLogin,
+  onGoogleLogin,
+  onVkLogin
+}: LoginScreenProps) {
+  const { width } = useWindowDimensions();
+  const styles = createStyles(theme, width);
 
   const [role, setRole] = useState<LoginRole>("student");
   const [authMode, setAuthMode] = useState<AuthMode>("login");
-  const [login, setLogin] = useState("student");
-  const [password, setPassword] = useState("student");
+  const [fullName, setFullName] = useState("");
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [successText, setSuccessText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
+  const [isVkSubmitting, setIsVkSubmitting] = useState(false);
 
   const roleTitle = useMemo(() => {
     if (role === "teacher") {
-      return authMode === "login" ? "Вход преподавателя" : "Регистрация преподавателя";
+      return "Вход преподавателя";
     }
 
-    return authMode === "login" ? "Вход студента" : "Регистрация студента";
+    return authMode === "register" ? "Регистрация студента" : "Вход студента";
   }, [role, authMode]);
 
   const roleSubtitle = useMemo(() => {
     if (role === "teacher") {
-      return authMode === "login"
-        ? "Управление лекциями, сессиями, вопросами и материалами."
-        : "Создай преподавательский профиль и перейди в рабочий кабинет.";
+      return "Доступ преподавателя открыт только по выданному логину и паролю.";
     }
 
-    return authMode === "login"
-      ? "Доступ к лекциям, LaTeX-материалам, видео и заданиям."
-      : "Создай студенческий профиль и начни работу с курсом.";
+    return authMode === "register"
+      ? "Сначала зарегистрируйся, потом входи только под своими данными."
+      : "Без регистрации доступ к каталогу и материалам закрыт.";
   }, [role, authMode]);
 
   const submitLabel = useMemo(() => {
-    if (authMode === "register") {
-      return role === "teacher" ? "Создать профиль преподавателя" : "Создать профиль студента";
+    if (role === "teacher") {
+      return "Войти как преподаватель";
     }
 
-    return role === "teacher" ? "Войти как преподаватель" : "Войти как студент";
+    return authMode === "register" ? "Зарегистрироваться" : "Войти как студент";
   }, [role, authMode]);
 
   const helperText = useMemo(() => {
-    if (authMode === "register") {
-      return role === "teacher"
-        ? "В демо-версии регистрация сразу открывает кабинет преподавателя."
-        : "В демо-версии регистрация сразу открывает студенческий кабинет.";
+    if (role === "teacher") {
+      return "Преподавательский доступ: teacher / teacher";
     }
 
-    return role === "teacher"
-      ? "Демо-вход: teacher / teacher"
-      : "Демо-вход: student / student";
+    return authMode === "register"
+      ? "После регистрации студент входит только по сохранённому логину и паролю."
+      : "Если аккаунта ещё нет, сначала зарегистрируйся.";
   }, [role, authMode]);
 
   function applyPreset(nextRole: LoginRole, nextMode: AuthMode) {
-    if (nextMode === "login") {
-      setLogin(nextRole === "teacher" ? "teacher" : "student");
-      setPassword(nextRole === "teacher" ? "teacher" : "student");
-    } else {
-      setLogin("");
-      setPassword("");
+    setError("");
+    setSuccessText("");
+    setFullName("");
+    setLogin("");
+    setPassword("");
+
+    if (nextRole === "teacher" && nextMode === "login") {
+      setLogin("teacher");
+      setPassword("teacher");
     }
   }
 
   function handleRoleChange(nextRole: LoginRole) {
     setRole(nextRole);
-    setError("");
+
+    if (nextRole === "teacher") {
+      setAuthMode("login");
+      applyPreset(nextRole, "login");
+      return;
+    }
+
     applyPreset(nextRole, authMode);
   }
 
   function handleModeChange(nextMode: AuthMode) {
+    if (role === "teacher") {
+      return;
+    }
+
     setAuthMode(nextMode);
-    setError("");
     applyPreset(role, nextMode);
   }
 
@@ -100,11 +139,34 @@ export function LoginScreen({ theme, onLogin, onGoogleLogin }: LoginScreenProps)
       return;
     }
 
+    if (role === "student" && authMode === "register" && !fullName.trim()) {
+      setError("Укажи имя студента.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError("");
+    setSuccessText("");
 
     try {
-      const nextError = await onLogin(login, password, role);
+      const nextError = await onLogin({
+        login,
+        password,
+        role,
+        mode: authMode,
+        fullName
+      });
+
+      if (nextError?.startsWith("REGISTRATION_SUCCESS::")) {
+        const registeredLogin = nextError.replace("REGISTRATION_SUCCESS::", "").trim();
+
+        setAuthMode("login");
+        setRole("student");
+        setLogin(registeredLogin);
+        setPassword("");
+        setSuccessText("Студент зарегистрирован. Теперь войди под своим логином и паролем.");
+        return;
+      }
 
       if (nextError) {
         setError(nextError);
@@ -117,11 +179,11 @@ export function LoginScreen({ theme, onLogin, onGoogleLogin }: LoginScreenProps)
   async function handleGoogle() {
     setIsGoogleSubmitting(true);
     setError("");
+    setSuccessText("");
 
     try {
       const nextError = await onGoogleLogin({
-        email: authMode === "register" ? "new_student@example.com" : "google_student@example.com",
-        fullName: authMode === "register" ? "Новый студент" : "Google студент"
+        mode: authMode
       });
 
       if (nextError) {
@@ -132,41 +194,56 @@ export function LoginScreen({ theme, onLogin, onGoogleLogin }: LoginScreenProps)
     }
   }
 
+  async function handleVk() {
+    setIsVkSubmitting(true);
+    setError("");
+    setSuccessText("");
+
+    try {
+      const nextError = await onVkLogin({
+        mode: authMode
+      });
+
+      if (nextError) {
+        setError(nextError);
+      }
+    } finally {
+      setIsVkSubmitting(false);
+    }
+  }
+
   return (
     <Screen theme={theme}>
       <View style={styles.page}>
         <View style={styles.heroCard}>
-          <View style={styles.logoOrb}>
-            <Text style={styles.logoLetters}>VM</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>VisualMath</Text>
           </View>
 
-          <Text style={styles.brand}>VisualMath</Text>
+          <Text style={styles.heroTitle}>Цифровой класс математики</Text>
           <Text style={styles.heroSubtitle}>
-            Умная образовательная платформа для математики, визуальных модулей и интерактивных материалов.
+            Закрытый учебный кабинет: курсы, лекции, материалы, встречи, домашние задания и результаты.
           </Text>
 
-          <View style={styles.branchSection}>
-            <View style={styles.branchStem} />
-            <View style={styles.branchRowLine} />
-
-            <View style={styles.roleRow}>
-              <RoleBranchCard
-                theme={theme}
-                title="Студент"
-                subtitle="Лекции, практика, PDF и LaTeX"
-                isActive={role === "student"}
-                onPress={() => handleRoleChange("student")}
-                align="left"
-              />
-              <RoleBranchCard
-                theme={theme}
-                title="Преподаватель"
-                subtitle="Лекции, сессии, редактор и материалы"
-                isActive={role === "teacher"}
-                onPress={() => handleRoleChange("teacher")}
-                align="right"
-              />
-            </View>
+          <View style={styles.roleGrid}>
+            <RoleCard
+              theme={theme}
+              title="Студент"
+              subtitle="Регистрация, вход и учебные материалы"
+              accent="С"
+              isActive={role === "student"}
+              onPress={() => handleRoleChange("student")}
+              fullWidth={width < 720}
+            />
+            <RoleCard
+              theme={theme}
+              title="Преподаватель"
+              subtitle="Вход только по выданным данным"
+              accent="П"
+              isActive={role === "teacher"}
+              onPress={() => handleRoleChange("teacher")}
+              fullWidth={width < 720}
+            />
           </View>
         </View>
 
@@ -178,23 +255,36 @@ export function LoginScreen({ theme, onLogin, onGoogleLogin }: LoginScreenProps)
               isActive={authMode === "login"}
               onPress={() => handleModeChange("login")}
             />
-            <ModeChip
-              theme={theme}
-              label="Регистрация"
-              isActive={authMode === "register"}
-              onPress={() => handleModeChange("register")}
-            />
+            {role === "student" ? (
+              <ModeChip
+                theme={theme}
+                label="Регистрация"
+                isActive={authMode === "register"}
+                onPress={() => handleModeChange("register")}
+              />
+            ) : null}
           </View>
 
           <Text style={styles.formTitle}>{roleTitle}</Text>
           <Text style={styles.formSubtitle}>{roleSubtitle}</Text>
 
+          {role === "student" && authMode === "register" ? (
+            <AppInput
+              label="Имя студента"
+              theme={theme}
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Например: Глеб Шкундин"
+              autoCorrect={false}
+            />
+          ) : null}
+
           <AppInput
-            label={authMode === "register" ? "Email или новый логин" : "Email или логин"}
+            label={role === "teacher" ? "Логин преподавателя" : "Логин студента"}
             theme={theme}
             value={login}
             onChangeText={setLogin}
-            placeholder={role === "teacher" ? "teacher" : "student"}
+            placeholder={role === "teacher" ? "teacher" : "student_login"}
             autoCorrect={false}
             autoCapitalize="none"
           />
@@ -211,6 +301,7 @@ export function LoginScreen({ theme, onLogin, onGoogleLogin }: LoginScreenProps)
           />
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {successText ? <Text style={styles.successText}>{successText}</Text> : null}
 
           <AppButton
             label={isSubmitting ? "Подождите..." : submitLabel}
@@ -230,9 +321,19 @@ export function LoginScreen({ theme, onLogin, onGoogleLogin }: LoginScreenProps)
               </View>
 
               <AppButton
-                label={isGoogleSubmitting ? "Подключаем Google..." : authMode === "register" ? "Зарегистрироваться через Google" : "Войти через Google"}
+                label={isGoogleSubmitting ? "Подключаем Google..." : "Продолжить через Google"}
                 onPress={() => {
                   void handleGoogle();
+                }}
+                theme={theme}
+                variant="secondary"
+                style={styles.socialButton}
+              />
+
+              <AppButton
+                label={isVkSubmitting ? "Подключаем VK..." : "Продолжить через VK"}
+                onPress={() => {
+                  void handleVk();
                 }}
                 theme={theme}
                 variant="secondary"
@@ -247,54 +348,64 @@ export function LoginScreen({ theme, onLogin, onGoogleLogin }: LoginScreenProps)
   );
 }
 
-type RoleBranchCardProps = {
+type RoleCardProps = {
   theme: AppTheme;
   title: string;
   subtitle: string;
+  accent: string;
   isActive: boolean;
   onPress: () => void;
-  align: "left" | "right";
+  fullWidth: boolean;
 };
 
-function RoleBranchCard({
+function RoleCard({
   theme,
   title,
   subtitle,
+  accent,
   isActive,
   onPress,
-  align
-}: RoleBranchCardProps) {
-  const styles = createRoleBranchCardStyles(theme, isActive, align);
+  fullWidth
+}: RoleCardProps) {
+  const styles = createRoleCardStyles(theme, isActive, fullWidth);
 
   return (
     <Pressable onPress={onPress} style={styles.card}>
-      <View style={styles.dot} />
+      <View style={styles.icon}>
+        <Text style={styles.iconText}>{accent}</Text>
+      </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
     </Pressable>
   );
 }
 
-function createRoleBranchCardStyles(theme: AppTheme, isActive: boolean, align: "left" | "right") {
+function createRoleCardStyles(theme: AppTheme, isActive: boolean, fullWidth: boolean) {
   return StyleSheet.create({
     card: {
-      flex: 1,
-      minHeight: 120,
+      flexBasis: fullWidth ? "100%" : undefined,
+      flex: fullWidth ? undefined : 1,
+      minHeight: 108,
       borderRadius: theme.radius.lg,
       padding: theme.spacing.lg,
       borderWidth: 1,
       borderColor: isActive ? theme.colors.primary : theme.colors.border,
       backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface,
-      ...(isActive ? theme.shadow.md : theme.shadow.sm),
-      marginLeft: align === "right" ? theme.spacing.sm : 0,
-      marginRight: align === "left" ? theme.spacing.sm : 0
+      ...(isActive ? theme.shadow.sm : {})
     },
-    dot: {
-      width: 12,
-      height: 12,
-      borderRadius: 999,
-      backgroundColor: isActive ? theme.colors.primary : theme.colors.border,
+    icon: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: isActive ? theme.colors.primary : theme.colors.surfaceMuted,
       marginBottom: theme.spacing.sm
+    },
+    iconText: {
+      color: isActive ? "#FFFFFF" : theme.colors.text,
+      fontSize: 16,
+      fontWeight: "900"
     },
     title: {
       fontSize: theme.typography.sectionTitle,
@@ -304,7 +415,7 @@ function createRoleBranchCardStyles(theme: AppTheme, isActive: boolean, align: "
     },
     subtitle: {
       fontSize: theme.typography.caption,
-      lineHeight: 19,
+      lineHeight: 18,
       color: theme.colors.textSecondary
     }
   });
@@ -331,14 +442,13 @@ function createModeChipStyles(theme: AppTheme, isActive: boolean) {
   return StyleSheet.create({
     chip: {
       flex: 1,
-      minHeight: 48,
+      minHeight: 44,
       borderRadius: theme.radius.md,
       borderWidth: 1,
       borderColor: isActive ? theme.colors.primary : theme.colors.border,
       backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface,
       alignItems: "center",
-      justifyContent: "center",
-      ...(isActive ? theme.shadow.sm : {})
+      justifyContent: "center"
     },
     label: {
       fontSize: theme.typography.body,
@@ -348,96 +458,77 @@ function createModeChipStyles(theme: AppTheme, isActive: boolean) {
   });
 }
 
-function createStyles(theme: AppTheme) {
+function createStyles(theme: AppTheme, width: number) {
+  const isPhone = width < 520;
+  const isCompact = width < 720;
+
   return StyleSheet.create({
     page: {
       width: "100%",
-      maxWidth: 1280,
+      maxWidth: 900,
       alignSelf: "center"
     },
     heroCard: {
-      borderRadius: theme.radius.xl,
-      padding: theme.spacing.xxl,
+      borderRadius: theme.radius.lg,
+      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.xl,
-      alignItems: "center",
-      ...theme.shadow.lg
-    },
-    logoOrb: {
-      width: 112,
-      height: 112,
-      borderRadius: 999,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.primary,
       marginBottom: theme.spacing.lg,
       ...theme.shadow.md
     },
-    logoLetters: {
-      color: "#FFFFFF",
-      fontSize: 34,
-      fontWeight: "900",
-      letterSpacing: 1
+    badge: {
+      alignSelf: "flex-start",
+      minHeight: 28,
+      paddingHorizontal: theme.spacing.sm,
+      borderRadius: theme.radius.pill,
+      backgroundColor: theme.colors.surfaceMuted,
+      justifyContent: "center",
+      marginBottom: theme.spacing.md
     },
-    brand: {
-      fontSize: theme.typography.hero,
+    badgeText: {
+      fontSize: theme.typography.caption,
+      fontWeight: "800",
+      color: theme.colors.primary
+    },
+    heroTitle: {
+      fontSize: isPhone ? 24 : theme.typography.title,
+      lineHeight: isPhone ? 30 : theme.typography.title + 4,
       fontWeight: "900",
       color: theme.colors.text,
-      marginBottom: theme.spacing.sm,
-      letterSpacing: -0.8
+      marginBottom: theme.spacing.sm
     },
     heroSubtitle: {
-      maxWidth: 760,
-      textAlign: "center",
       fontSize: theme.typography.body,
-      lineHeight: 26,
+      lineHeight: 22,
       color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.xl
-    },
-    branchSection: {
-      width: "100%",
-      maxWidth: 980,
-      alignItems: "center"
-    },
-    branchStem: {
-      width: 2,
-      height: 28,
-      backgroundColor: theme.colors.border
-    },
-    branchRowLine: {
-      width: "70%",
-      height: 2,
-      backgroundColor: theme.colors.border,
       marginBottom: theme.spacing.lg
     },
-    roleRow: {
-      width: "100%",
-      flexDirection: "row",
-      alignItems: "stretch"
+    roleGrid: {
+      flexDirection: isCompact ? "column" : "row"
     },
     formCard: {
-      borderRadius: theme.radius.xl,
-      padding: theme.spacing.xxl,
+      borderRadius: theme.radius.lg,
+      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      ...theme.shadow.lg
+      ...theme.shadow.md
     },
     modeRow: {
       flexDirection: "row",
-      marginBottom: theme.spacing.xl
+      marginBottom: theme.spacing.lg
     },
     formTitle: {
-      fontSize: theme.typography.screenTitle,
+      fontSize: isPhone ? 22 : theme.typography.screenTitle,
+      lineHeight: isPhone ? 28 : theme.typography.screenTitle + 4,
       fontWeight: "900",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
     formSubtitle: {
       fontSize: theme.typography.body,
-      lineHeight: 24,
+      lineHeight: 22,
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.lg
     },
@@ -445,10 +536,19 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.danger,
       fontSize: theme.typography.caption,
       marginBottom: theme.spacing.sm,
-      fontWeight: "600"
+      fontWeight: "700"
+    },
+    successText: {
+      color: theme.colors.success,
+      fontSize: theme.typography.caption,
+      marginBottom: theme.spacing.sm,
+      fontWeight: "700"
     },
     primaryButton: {
-      marginTop: theme.spacing.sm
+      marginTop: theme.spacing.xs
+    },
+    socialButton: {
+      marginBottom: theme.spacing.sm
     },
     dividerRow: {
       flexDirection: "row",

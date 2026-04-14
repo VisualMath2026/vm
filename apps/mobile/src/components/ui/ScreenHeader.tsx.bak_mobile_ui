@@ -1,5 +1,5 @@
 ﻿import React from "react";
-import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { fixText } from "../../utils/fixText";
 import type { AppTheme } from "../../theme";
@@ -17,8 +17,7 @@ export function ScreenHeader({
   subtitle,
   rightSlot
 }: ScreenHeaderProps) {
-  const { width } = useWindowDimensions();
-  const styles = createStyles(theme, width);
+  const styles = createStyles(theme);
 
   return (
     <View style={styles.wrapper}>
@@ -34,28 +33,24 @@ export function ScreenHeader({
   );
 }
 
-function createStyles(theme: AppTheme, width: number) {
-  const isCompact = width < 820;
-  const isPhone = width < 480;
-  const titleSize = isPhone ? 24 : isCompact ? 24 : theme.typography.screenTitle;
-
+function createStyles(theme: AppTheme) {
   return StyleSheet.create({
     wrapper: {
-      marginBottom: isPhone ? theme.spacing.lg : theme.spacing.xl
+      marginBottom: theme.spacing.xl
     },
     row: {
-      flexDirection: isCompact ? "column" : "row",
+      flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "flex-start",
       gap: theme.spacing.md
     },
     textBlock: {
       flex: 1,
-      maxWidth: isCompact ? undefined : 860
+      maxWidth: 860
     },
     title: {
-      fontSize: titleSize,
-      lineHeight: titleSize + 6,
+      fontSize: theme.typography.screenTitle,
+      lineHeight: theme.typography.screenTitle + 6,
       fontWeight: "800",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs,
@@ -63,12 +58,11 @@ function createStyles(theme: AppTheme, width: number) {
     },
     subtitle: {
       fontSize: theme.typography.body,
-      lineHeight: 22,
+      lineHeight: 24,
       color: theme.colors.textSecondary
     },
     rightSlot: {
-      width: isCompact ? "100%" : undefined,
-      marginTop: isCompact ? 0 : theme.spacing.xs
+      marginTop: theme.spacing.xs
     }
   });
 }

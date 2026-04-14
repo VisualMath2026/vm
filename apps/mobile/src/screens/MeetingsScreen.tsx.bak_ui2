@@ -34,8 +34,6 @@ type MeetingsScreenProps = {
   onDeleteMeeting: (meetingId: string) => void;
 };
 
-type MeetingFilter = "all" | "live" | "soon" | "done";
-
 const PLATFORM_OPTIONS = [
   "Яндекс Телемост",
   "Zoom",
@@ -62,7 +60,6 @@ export function MeetingsScreen({
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
   const [nowTs, setNowTs] = useState(Date.now());
-  const [filter, setFilter] = useState<MeetingFilter>("all");
 
   useEffect(() => {
     const timerId = setInterval(() => {
@@ -78,29 +75,12 @@ export function MeetingsScreen({
     });
   }, [meetings]);
 
-  const stats = useMemo(() => {
-    return {
-      all: sortedMeetings.length,
-      live: sortedMeetings.filter((meeting) => getMeetingStatus(meeting, nowTs) === "live").length,
-      soon: sortedMeetings.filter((meeting) => getMeetingStatus(meeting, nowTs) === "soon").length,
-      done: sortedMeetings.filter((meeting) => getMeetingStatus(meeting, nowTs) === "done").length
-    };
-  }, [nowTs, sortedMeetings]);
-
   const nextMeeting = useMemo(() => {
     return sortedMeetings.find((meeting) => {
       const status = getMeetingStatus(meeting, nowTs);
       return status === "soon" || status === "live";
     }) ?? sortedMeetings[0] ?? null;
   }, [nowTs, sortedMeetings]);
-
-  const filteredMeetings = useMemo(() => {
-    if (filter === "all") {
-      return sortedMeetings;
-    }
-
-    return sortedMeetings.filter((meeting) => getMeetingStatus(meeting, nowTs) === filter);
-  }, [filter, nowTs, sortedMeetings]);
 
   function handleCreate() {
     const nextTitle = title.trim();
@@ -150,10 +130,10 @@ export function MeetingsScreen({
       <ScreenHeader
         theme={theme}
         title="Миты и онлайн-встречи"
-        subtitle="Подключение к занятиям, консультациям и разборам по одной ссылке."
+        subtitle="Актуальные ссылки на созвоны, занятия и консультации с возможностью подключения в реальном времени."
         rightSlot={
           <View style={styles.headerChip}>
-            <Text style={styles.headerChipText}>{stats.all} встреч</Text>
+            <Text style={styles.headerChipText}>{sortedMeetings.length} встреч</Text>
           </View>
         }
       />
@@ -169,19 +149,8 @@ export function MeetingsScreen({
               ? fixText(
                   `${nextMeeting.platform} • ${formatMeetingDate(nextMeeting.scheduledAt)} • ${nextMeeting.durationMin} мин`
                 )
-              : "Когда преподаватель добавит конференцию, она сразу появится здесь."}
+              : "Преподаватель может добавить новую конференцию, а студент — открыть ссылку и быстро подключиться."}
           </Text>
-
-          {nextMeeting ? (
-            <View style={styles.heroBottomRow}>
-              <StatusPill
-                theme={theme}
-                label={meetingStatusLabel(getMeetingStatus(nextMeeting, nowTs))}
-                tone={meetingStatusTone(getMeetingStatus(nextMeeting, nowTs))}
-              />
-              <Text style={styles.heroHint}>{buildTimeHint(nextMeeting, nowTs)}</Text>
-            </View>
-          ) : null}
 
           {nextMeeting ? (
             <View style={styles.heroActions}>
@@ -197,57 +166,25 @@ export function MeetingsScreen({
         </View>
 
         <View style={styles.heroStats}>
-          <MiniStatCard theme={theme} value={String(stats.all)} label="Всего" />
-          <MiniStatCard theme={theme} value={String(stats.live)} label="Идут сейчас" />
-          <MiniStatCard theme={theme} value={String(stats.soon)} label="Скоро" />
+          <MiniStatCard theme={theme} value={String(sortedMeetings.length)} label="Всего встреч" />
+          <MiniStatCard
+            theme={theme}
+            value={String(sortedMeetings.filter((meeting) => getMeetingStatus(meeting, nowTs) === "live").length)}
+            label="Идут сейчас"
+          />
+          <MiniStatCard
+            theme={theme}
+            value={String(sortedMeetings.filter((meeting) => getMeetingStatus(meeting, nowTs) === "soon").length)}
+            label="Скоро"
+          />
         </View>
       </View>
-
-      <SectionCard
-        theme={theme}
-        title="Быстрая навигация"
-        subtitle="Можно отфильтровать список по текущему статусу."
-      >
-        <View style={styles.filterRow}>
-          {[
-            { key: "all", label: `Все (${stats.all})` },
-            { key: "live", label: `Сейчас (${stats.live})` },
-            { key: "soon", label: `Скоро (${stats.soon})` },
-            { key: "done", label: `Прошедшие (${stats.done})` }
-          ].map((item) => {
-            const isActive = filter === item.key;
-
-            return (
-              <Pressable
-                key={item.key}
-                onPress={() => setFilter(item.key as MeetingFilter)}
-                style={[
-                  styles.filterChip,
-                  {
-                    borderColor: isActive ? theme.colors.primary : theme.colors.border,
-                    backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface
-                  }
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: isActive ? theme.colors.primary : theme.colors.text }
-                  ]}
-                >
-                  {fixText(item.label)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </SectionCard>
 
       {isTeacher ? (
         <SectionCard
           theme={theme}
           title="Добавить новую встречу"
-          subtitle="Укажите платформу, ссылку и точное время начала."
+          subtitle="Укажите сервис, ссылку, дату и время конференции."
         >
           <AppInput
             label="Название встречи"
@@ -359,17 +296,17 @@ export function MeetingsScreen({
       <SectionCard
         theme={theme}
         title="Список встреч"
-        subtitle={filteredMeetings.length > 0 ? `Найдено встреч: ${filteredMeetings.length}` : "По выбранному фильтру встреч нет"}
+        subtitle={sortedMeetings.length > 0 ? `Всего встреч: ${sortedMeetings.length}` : "Пока встреч нет"}
       >
-        {filteredMeetings.length === 0 ? (
+        {sortedMeetings.length === 0 ? (
           <Text style={styles.emptyText}>
             {isTeacher
-              ? "Пока нет встреч в выбранной категории."
-              : "Преподаватель пока не добавил встреч в этой категории."}
+              ? "Пока нет созданных встреч. Добавьте первую конференцию."
+              : "Пока преподаватель не добавил ни одной встречи."}
           </Text>
         ) : (
           <View style={styles.meetingList}>
-            {filteredMeetings.map((meeting) => {
+            {sortedMeetings.map((meeting) => {
               const status = getMeetingStatus(meeting, nowTs);
 
               return (
@@ -395,8 +332,6 @@ export function MeetingsScreen({
                     <InfoTile theme={theme} label="Длительность" value={`${meeting.durationMin} мин`} />
                     <InfoTile theme={theme} label="Добавил" value={meeting.createdBy} />
                   </View>
-
-                  <Text style={styles.scheduleHint}>{buildTimeHint(meeting, nowTs)}</Text>
 
                   {meeting.description ? (
                     <Text style={styles.descriptionText}>{fixText(meeting.description)}</Text>
@@ -507,29 +442,6 @@ function meetingStatusTone(status: "soon" | "live" | "done") {
   return "neutral";
 }
 
-function buildTimeHint(meeting: MeetingItem, nowTs: number): string {
-  const startTs = new Date(meeting.scheduledAt).getTime();
-  const endTs = startTs + meeting.durationMin * 60 * 1000;
-  const diffMin = Math.round((startTs - nowTs) / 60000);
-
-  if (nowTs < startTs) {
-    if (diffMin < 60) {
-      return `Старт через ${diffMin} мин`;
-    }
-
-    const hours = Math.floor(diffMin / 60);
-    const minutes = diffMin % 60;
-    return `Старт через ${hours} ч ${minutes} мин`;
-  }
-
-  if (nowTs <= endTs) {
-    const leftMin = Math.max(0, Math.round((endTs - nowTs) / 60000));
-    return `До завершения примерно ${leftMin} мин`;
-  }
-
-  return "Встреча уже завершилась";
-}
-
 function formatMeetingDate(value: string): string {
   const date = new Date(value);
 
@@ -566,12 +478,13 @@ function createStyles(theme: AppTheme) {
     heroCard: {
       flexDirection: "row",
       flexWrap: "wrap",
-      borderRadius: theme.radius.lg,
+      borderRadius: theme.radius.xl,
       padding: theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.lg
+      marginBottom: theme.spacing.lg,
+      ...theme.shadow.lg
     },
     heroLeft: {
       flex: 1,
@@ -597,21 +510,8 @@ function createStyles(theme: AppTheme) {
       fontSize: theme.typography.body,
       lineHeight: 26,
       color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.md,
+      marginBottom: theme.spacing.lg,
       maxWidth: 760
-    },
-    heroBottomRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      alignItems: "center",
-      marginBottom: theme.spacing.md
-    },
-    heroHint: {
-      fontSize: theme.typography.caption,
-      fontWeight: "700",
-      color: theme.colors.textSecondary,
-      marginLeft: theme.spacing.sm,
-      marginTop: 2
     },
     heroActions: {
       flexDirection: "row",
@@ -644,24 +544,6 @@ function createStyles(theme: AppTheme) {
       fontSize: theme.typography.caption,
       fontWeight: "700",
       color: theme.colors.textSecondary
-    },
-    filterRow: {
-      flexDirection: "row",
-      flexWrap: "wrap"
-    },
-    filterChip: {
-      minHeight: 40,
-      paddingHorizontal: theme.spacing.md,
-      borderRadius: theme.radius.pill,
-      borderWidth: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: theme.spacing.sm,
-      marginBottom: theme.spacing.sm
-    },
-    filterChipText: {
-      fontSize: theme.typography.caption,
-      fontWeight: "800"
     },
     sectionLabel: {
       fontSize: theme.typography.caption,
@@ -715,12 +597,13 @@ function createStyles(theme: AppTheme) {
       width: "100%"
     },
     meetingCard: {
-      borderRadius: theme.radius.lg,
+      borderRadius: theme.radius.xl,
       padding: theme.spacing.lg,
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.surfaceElevated,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.md
+      marginBottom: theme.spacing.md,
+      ...theme.shadow.md
     },
     meetingTop: {
       flexDirection: "row",
@@ -757,12 +640,12 @@ function createStyles(theme: AppTheme) {
       marginBottom: theme.spacing.sm,
       padding: theme.spacing.md,
       borderRadius: theme.radius.md,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surfaceMuted,
       borderWidth: 1,
       borderColor: theme.colors.border
     },
     infoTileLabel: {
-      fontSize: theme.typography.caption,
+      fontSize: theme.typography.helper,
       fontWeight: "700",
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.xs
@@ -771,12 +654,6 @@ function createStyles(theme: AppTheme) {
       fontSize: theme.typography.body,
       fontWeight: "800",
       color: theme.colors.text
-    },
-    scheduleHint: {
-      fontSize: theme.typography.caption,
-      fontWeight: "700",
-      color: theme.colors.primary,
-      marginBottom: theme.spacing.sm
     },
     descriptionText: {
       fontSize: theme.typography.body,
