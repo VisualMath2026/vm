@@ -1370,7 +1370,7 @@ export function AppNavigation() {
   }
 
   async function handleGoogleLogin(_payload: GoogleLoginPayload): Promise<string | null> {
-    if (!GOOGLE_WEB_CLIENT_ID || GOOGLE_WEB_CLIENT_ID.StartsWith("PASTE_YOUR_WEB_CLIENT_ID_HERE")) {
+    if (!GOOGLE_WEB_CLIENT_ID || GOOGLE_WEB_CLIENT_ID.startsWith("PASTE_YOUR_WEB_CLIENT_ID_HERE")) {
       return "Сначала вставь реальный Google Web Client ID в AppNavigation.tsx.";
     }
 
