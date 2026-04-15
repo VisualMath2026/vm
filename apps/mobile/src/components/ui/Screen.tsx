@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -50,11 +50,7 @@ export function Screen({
 }
 
 function createStyles(theme: AppTheme, width: number) {
-  const horizontalPadding =
-    width < 480 ? theme.spacing.sm : width < 900 ? theme.spacing.md : theme.spacing.lg;
-
-  const verticalPadding =
-    width < 480 ? theme.spacing.md : theme.spacing.lg;
+  const isPhone = width < 560;
 
   return StyleSheet.create({
     safeArea: {
@@ -66,17 +62,17 @@ function createStyles(theme: AppTheme, width: number) {
     },
     scrollContent: {
       flexGrow: 1,
-      paddingHorizontal: horizontalPadding,
-      paddingVertical: verticalPadding
+      paddingHorizontal: isPhone ? theme.spacing.md : theme.spacing.lg,
+      paddingVertical: theme.spacing.lg
     },
     content: {
       flex: 1,
-      paddingHorizontal: horizontalPadding,
-      paddingVertical: verticalPadding
+      paddingHorizontal: isPhone ? theme.spacing.md : theme.spacing.lg,
+      paddingVertical: theme.spacing.lg
     },
     inner: {
       width: "100%",
-      maxWidth: width < 900 ? undefined : 1240,
+      maxWidth: 1120,
       alignSelf: "center"
     }
   });

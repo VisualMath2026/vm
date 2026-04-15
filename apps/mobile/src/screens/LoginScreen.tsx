@@ -77,8 +77,8 @@ export function LoginScreen({
     }
 
     return authMode === "register"
-      ? "Сначала зарегистрируйся, потом входи только под своими данными."
-      : "Без регистрации доступ к каталогу и материалам закрыт.";
+      ? "Создай студенческий аккаунт и используй его для входа в учебный кабинет."
+      : "Войди в аккаунт, чтобы открыть курсы, материалы, домашние задания и результаты.";
   }, [role, authMode]);
 
   const submitLabel = useMemo(() => {
@@ -87,16 +87,6 @@ export function LoginScreen({
     }
 
     return authMode === "register" ? "Зарегистрироваться" : "Войти как студент";
-  }, [role, authMode]);
-
-  const helperText = useMemo(() => {
-    if (role === "teacher") {
-      return "Преподавательский доступ: teacher / teacher";
-    }
-
-    return authMode === "register"
-      ? "После регистрации студент входит только по сохранённому логину и паролю."
-      : "Если аккаунта ещё нет, сначала зарегистрируйся.";
   }, [role, authMode]);
 
   function applyPreset(nextRole: LoginRole, nextMode: AuthMode) {
@@ -164,7 +154,7 @@ export function LoginScreen({
         setRole("student");
         setLogin(registeredLogin);
         setPassword("");
-        setSuccessText("Студент зарегистрирован. Теперь войди под своим логином и паролем.");
+        setSuccessText("Регистрация прошла. Теперь войди под своим логином и паролем.");
         return;
       }
 
@@ -182,9 +172,7 @@ export function LoginScreen({
     setSuccessText("");
 
     try {
-      const nextError = await onGoogleLogin({
-        mode: authMode
-      });
+      const nextError = await onGoogleLogin({ mode: authMode });
 
       if (nextError) {
         setError(nextError);
@@ -200,9 +188,7 @@ export function LoginScreen({
     setSuccessText("");
 
     try {
-      const nextError = await onVkLogin({
-        mode: authMode
-      });
+      const nextError = await onVkLogin({ mode: authMode });
 
       if (nextError) {
         setError(nextError);
@@ -215,133 +201,141 @@ export function LoginScreen({
   return (
     <Screen theme={theme}>
       <View style={styles.page}>
-        <View style={styles.heroCard}>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>VisualMath</Text>
+        <View style={styles.layout}>
+          <View style={styles.heroPanel}>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>VisualMath Classroom</Text>
+            </View>
+
+            <Text style={styles.heroTitle}>Математика в одном учебном пространстве</Text>
+            <Text style={styles.heroSubtitle}>
+              Курсы, материалы, встречи, тестирование и домашние задания в аккуратном интерфейсе учебного кабинета.
+            </Text>
+
+            <View style={styles.roleGrid}>
+              <RoleCard
+                theme={theme}
+                title="Студент"
+                subtitle="Курсы, задания и результаты"
+                accent="С"
+                isActive={role === "student"}
+                onPress={() => handleRoleChange("student")}
+                fullWidth={width < 860}
+              />
+              <RoleCard
+                theme={theme}
+                title="Преподаватель"
+                subtitle="Управление курсом и группой"
+                accent="П"
+                isActive={role === "teacher"}
+                onPress={() => handleRoleChange("teacher")}
+                fullWidth={width < 860}
+              />
+            </View>
           </View>
 
-          <Text style={styles.heroTitle}>Цифровой класс математики</Text>
-          <Text style={styles.heroSubtitle}>
-            Закрытый учебный кабинет: курсы, лекции, материалы, встречи, домашние задания и результаты.
-          </Text>
-
-          <View style={styles.roleGrid}>
-            <RoleCard
-              theme={theme}
-              title="Студент"
-              subtitle="Регистрация, вход и учебные материалы"
-              accent="С"
-              isActive={role === "student"}
-              onPress={() => handleRoleChange("student")}
-              fullWidth={width < 720}
-            />
-            <RoleCard
-              theme={theme}
-              title="Преподаватель"
-              subtitle="Вход только по выданным данным"
-              accent="П"
-              isActive={role === "teacher"}
-              onPress={() => handleRoleChange("teacher")}
-              fullWidth={width < 720}
-            />
-          </View>
-        </View>
-
-        <View style={styles.formCard}>
-          <View style={styles.modeRow}>
-            <ModeChip
-              theme={theme}
-              label="Вход"
-              isActive={authMode === "login"}
-              onPress={() => handleModeChange("login")}
-            />
-            {role === "student" ? (
+          <View style={styles.formPanel}>
+            <View style={styles.modeRow}>
               <ModeChip
                 theme={theme}
-                label="Регистрация"
-                isActive={authMode === "register"}
-                onPress={() => handleModeChange("register")}
+                label="Вход"
+                isActive={authMode === "login"}
+                onPress={() => handleModeChange("login")}
+              />
+              {role === "student" ? (
+                <ModeChip
+                  theme={theme}
+                  label="Регистрация"
+                  isActive={authMode === "register"}
+                  onPress={() => handleModeChange("register")}
+                />
+              ) : null}
+            </View>
+
+            <Text style={styles.formTitle}>{roleTitle}</Text>
+            <Text style={styles.formSubtitle}>{roleSubtitle}</Text>
+
+            {role === "student" && authMode === "register" ? (
+              <AppInput
+                label="Имя студента"
+                theme={theme}
+                value={fullName}
+                onChangeText={setFullName}
+                placeholder="Например: Глеб Шкундин"
+                autoCorrect={false}
               />
             ) : null}
-          </View>
 
-          <Text style={styles.formTitle}>{roleTitle}</Text>
-          <Text style={styles.formSubtitle}>{roleSubtitle}</Text>
-
-          {role === "student" && authMode === "register" ? (
             <AppInput
-              label="Имя студента"
+              label={role === "teacher" ? "Логин преподавателя" : "Логин студента"}
               theme={theme}
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Например: Глеб Шкундин"
+              value={login}
+              onChangeText={setLogin}
+              placeholder={role === "teacher" ? "teacher" : "student_login"}
               autoCorrect={false}
+              autoCapitalize="none"
             />
-          ) : null}
 
-          <AppInput
-            label={role === "teacher" ? "Логин преподавателя" : "Логин студента"}
-            theme={theme}
-            value={login}
-            onChangeText={setLogin}
-            placeholder={role === "teacher" ? "teacher" : "student_login"}
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
+            <AppInput
+              label="Пароль"
+              theme={theme}
+              value={password}
+              onChangeText={setPassword}
+              placeholder={authMode === "register" ? "Придумай пароль" : "Введите пароль"}
+              secureTextEntry
+              autoCorrect={false}
+              autoCapitalize="none"
+            />
 
-          <AppInput
-            label="Пароль"
-            theme={theme}
-            value={password}
-            onChangeText={setPassword}
-            placeholder={authMode === "register" ? "Придумай пароль" : "Введите пароль"}
-            secureTextEntry
-            autoCorrect={false}
-            autoCapitalize="none"
-          />
+            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {successText ? <Text style={styles.successText}>{successText}</Text> : null}
 
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          {successText ? <Text style={styles.successText}>{successText}</Text> : null}
+            <AppButton
+              label={isSubmitting ? "Подождите..." : submitLabel}
+              onPress={() => {
+                void handleSubmit();
+              }}
+              theme={theme}
+              style={styles.primaryButton}
+            />
 
-          <AppButton
-            label={isSubmitting ? "Подождите..." : submitLabel}
-            onPress={() => {
-              void handleSubmit();
-            }}
-            theme={theme}
-            style={styles.primaryButton}
-          />
+            {role === "student" ? (
+              <>
+                <View style={styles.dividerRow}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>или</Text>
+                  <View style={styles.dividerLine} />
+                </View>
 
-          {role === "student" ? (
-            <>
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>или</Text>
-                <View style={styles.dividerLine} />
-              </View>
+                <AppButton
+                  label={isGoogleSubmitting ? "Подключаем Google..." : "Продолжить через Google"}
+                  onPress={() => {
+                    void handleGoogle();
+                  }}
+                  theme={theme}
+                  variant="secondary"
+                  style={styles.socialButton}
+                />
 
-              <AppButton
-                label={isGoogleSubmitting ? "Подключаем Google..." : "Продолжить через Google"}
-                onPress={() => {
-                  void handleGoogle();
-                }}
-                theme={theme}
-                variant="secondary"
-                style={styles.socialButton}
-              />
+                <AppButton
+                  label={isVkSubmitting ? "Подключаем VK..." : "Продолжить через VK"}
+                  onPress={() => {
+                    void handleVk();
+                  }}
+                  theme={theme}
+                  variant="secondary"
+                />
+              </>
+            ) : null}
 
-              <AppButton
-                label={isVkSubmitting ? "Подключаем VK..." : "Продолжить через VK"}
-                onPress={() => {
-                  void handleVk();
-                }}
-                theme={theme}
-                variant="secondary"
-              />
-            </>
-          ) : null}
-
-          <Text style={styles.helperText}>{helperText}</Text>
+            <Text style={styles.helperText}>
+              {role === "teacher"
+                ? "Преподавательский доступ: teacher / teacher"
+                : authMode === "register"
+                  ? "После регистрации студент входит только по сохранённому логину и паролю."
+                  : "Если аккаунта ещё нет, сначала зарегистрируйся."}
+            </Text>
+          </View>
         </View>
       </View>
     </Screen>
@@ -385,18 +379,17 @@ function createRoleCardStyles(theme: AppTheme, isActive: boolean, fullWidth: boo
     card: {
       flexBasis: fullWidth ? "100%" : undefined,
       flex: fullWidth ? undefined : 1,
-      minHeight: 108,
+      minHeight: 120,
       borderRadius: theme.radius.lg,
       padding: theme.spacing.lg,
       borderWidth: 1,
       borderColor: isActive ? theme.colors.primary : theme.colors.border,
-      backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface,
-      ...(isActive ? theme.shadow.sm : {})
+      backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surface
     },
     icon: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: isActive ? theme.colors.primary : theme.colors.surfaceMuted,
@@ -405,11 +398,11 @@ function createRoleCardStyles(theme: AppTheme, isActive: boolean, fullWidth: boo
     iconText: {
       color: isActive ? "#FFFFFF" : theme.colors.text,
       fontSize: 16,
-      fontWeight: "900"
+      fontWeight: "700"
     },
     title: {
       fontSize: theme.typography.sectionTitle,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -442,59 +435,72 @@ function createModeChipStyles(theme: AppTheme, isActive: boolean) {
   return StyleSheet.create({
     chip: {
       flex: 1,
-      minHeight: 44,
+      minHeight: 42,
       borderRadius: theme.radius.md,
       borderWidth: 1,
       borderColor: isActive ? theme.colors.primary : theme.colors.border,
-      backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface,
+      backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surface,
       alignItems: "center",
       justifyContent: "center"
     },
     label: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
+      fontWeight: "700",
       color: isActive ? theme.colors.primary : theme.colors.text
     }
   });
 }
 
 function createStyles(theme: AppTheme, width: number) {
-  const isPhone = width < 520;
-  const isCompact = width < 720;
+  const isPhone = width < 560;
+  const isStacked = width < 980;
 
   return StyleSheet.create({
     page: {
       width: "100%",
-      maxWidth: 900,
+      maxWidth: 1160,
       alignSelf: "center"
     },
-    heroCard: {
-      borderRadius: theme.radius.lg,
-      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
+    layout: {
+      flexDirection: isStacked ? "column" : "row",
+      alignItems: "stretch"
+    },
+    heroPanel: {
+      flex: 1.1,
+      borderRadius: theme.radius.xl,
+      padding: isPhone ? theme.spacing.lg : theme.spacing.xxl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.lg,
-      ...theme.shadow.md
+      marginBottom: isStacked ? theme.spacing.lg : 0,
+      marginRight: isStacked ? 0 : theme.spacing.lg
     },
-    badge: {
+    formPanel: {
+      flex: 0.95,
+      borderRadius: theme.radius.xl,
+      padding: isPhone ? theme.spacing.lg : theme.spacing.xxl,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    heroBadge: {
       alignSelf: "flex-start",
-      minHeight: 28,
+      minHeight: 30,
       paddingHorizontal: theme.spacing.sm,
       borderRadius: theme.radius.pill,
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.primarySoft,
       justifyContent: "center",
       marginBottom: theme.spacing.md
     },
-    badgeText: {
+    heroBadgeText: {
+      color: theme.colors.primary,
       fontSize: theme.typography.caption,
-      fontWeight: "800",
-      color: theme.colors.primary
+      fontWeight: "700"
     },
     heroTitle: {
-      fontSize: isPhone ? 24 : theme.typography.title,
-      lineHeight: isPhone ? 30 : theme.typography.title + 4,
-      fontWeight: "900",
+      fontSize: isPhone ? 24 : theme.typography.hero,
+      lineHeight: isPhone ? 30 : theme.typography.hero + 6,
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
@@ -502,27 +508,22 @@ function createStyles(theme: AppTheme, width: number) {
       fontSize: theme.typography.body,
       lineHeight: 22,
       color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.lg
+      marginBottom: theme.spacing.xl,
+      maxWidth: 520
     },
     roleGrid: {
-      flexDirection: isCompact ? "column" : "row"
-    },
-    formCard: {
-      borderRadius: theme.radius.lg,
-      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      ...theme.shadow.md
+      flexDirection: width < 860 ? "column" : "row",
+      gap: theme.spacing.md
     },
     modeRow: {
       flexDirection: "row",
+      gap: theme.spacing.sm,
       marginBottom: theme.spacing.lg
     },
     formTitle: {
       fontSize: isPhone ? 22 : theme.typography.screenTitle,
       lineHeight: isPhone ? 28 : theme.typography.screenTitle + 4,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -547,9 +548,6 @@ function createStyles(theme: AppTheme, width: number) {
     primaryButton: {
       marginTop: theme.spacing.xs
     },
-    socialButton: {
-      marginBottom: theme.spacing.sm
-    },
     dividerRow: {
       flexDirection: "row",
       alignItems: "center",
@@ -566,6 +564,9 @@ function createStyles(theme: AppTheme, width: number) {
       color: theme.colors.textSecondary,
       fontSize: theme.typography.caption,
       fontWeight: "700"
+    },
+    socialButton: {
+      marginBottom: theme.spacing.sm
     },
     helperText: {
       marginTop: theme.spacing.lg,

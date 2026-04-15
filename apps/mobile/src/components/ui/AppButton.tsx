@@ -1,9 +1,8 @@
-﻿import React from "react";
+import React from "react";
 import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  useWindowDimensions,
   type ViewStyle
 } from "react-native";
 
@@ -31,19 +30,16 @@ export function AppButton({
   disabled = false,
   style
 }: AppButtonProps) {
-  const { width } = useWindowDimensions();
-  const styles = createStyles(theme, variant, disabled, fullWidth, width);
+  const styles = createStyles(theme, variant, disabled, fullWidth);
 
   return (
     <TouchableOpacity
-      activeOpacity={0.9}
+      activeOpacity={0.92}
       disabled={disabled}
       onPress={onPress}
       style={[styles.button, style]}
     >
-      <Text numberOfLines={1} style={styles.label}>
-        {fixText(label)}
-      </Text>
+      <Text style={styles.label}>{fixText(label)}</Text>
     </TouchableOpacity>
   );
 }
@@ -52,41 +48,35 @@ function createStyles(
   theme: AppTheme,
   variant: ButtonVariant,
   disabled: boolean,
-  fullWidth: boolean,
-  width: number
+  fullWidth: boolean
 ) {
   const isPrimary = variant === "primary";
   const isSecondary = variant === "secondary";
-  const isPhone = width < 520;
+  const isGhost = variant === "ghost";
 
   return StyleSheet.create({
     button: {
       width: fullWidth ? "100%" : undefined,
-      minHeight: isPhone ? 46 : 50,
+      minHeight: 46,
       borderRadius: theme.radius.md,
-      paddingHorizontal: isPhone ? theme.spacing.md : theme.spacing.lg,
-      paddingVertical: isPhone ? theme.spacing.sm : theme.spacing.md,
+      paddingHorizontal: theme.spacing.lg,
+      paddingVertical: theme.spacing.sm,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: isPrimary
         ? theme.colors.primary
         : isSecondary
-          ? theme.colors.surfaceMuted
+          ? theme.colors.surface
           : "transparent",
-      borderWidth: 1,
-      borderColor:
-        variant === "ghost"
-          ? theme.colors.border
-          : isPrimary
-            ? theme.colors.primary
-            : theme.colors.border,
+      borderWidth: isGhost ? 0 : 1,
+      borderColor: isPrimary ? theme.colors.primary : theme.colors.border,
       opacity: disabled ? 0.55 : 1,
       ...(isPrimary ? theme.shadow.sm : {})
     },
     label: {
       color: isPrimary ? "#FFFFFF" : theme.colors.text,
-      fontSize: isPhone ? 14 : theme.typography.body,
-      fontWeight: "800",
+      fontSize: theme.typography.body,
+      fontWeight: "700",
       letterSpacing: 0.1
     }
   });

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import type { LectureDetails, QuizQuestion } from "@vm/shared";
 
 import { AppButton } from "../components/ui/AppButton";
@@ -66,7 +66,8 @@ export function TeacherHomeScreen({
   onDeleteLecture,
   onLogout
 }: TeacherHomeScreenProps) {
-  const styles = createStyles(theme);
+  const { width } = useWindowDimensions();
+  const styles = createStyles(theme, width);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -125,6 +126,7 @@ export function TeacherHomeScreen({
   const teacherDisplayName = /[А-Яа-яЁёA-Za-z]/.test(normalizedTeacherName)
     ? normalizedTeacherName
     : "Преподаватель VisualMath";
+
   const teacherVideoUrl =
     expandedLecture ? ((expandedLecture as LectureItem & { videoUrl?: string }).videoUrl ?? "") : "";
 
@@ -183,7 +185,7 @@ export function TeacherHomeScreen({
 
     if (!nextSubject || !nextSemester || !nextLevel) {
       setCreateSuccess("");
-      setCreateError("Заполните предмет, семестр и уровень.");
+      setCreateError("Заполни предмет, семестр и уровень.");
       return;
     }
 
@@ -267,7 +269,7 @@ export function TeacherHomeScreen({
 
     if (!optionA.trim() || !optionB.trim() || !optionC.trim() || !optionD.trim()) {
       setQuestionSuccess("");
-      setQuestionError("Заполните все четыре варианта ответа.");
+      setQuestionError("Заполни все четыре варианта ответа.");
       return;
     }
 
@@ -290,41 +292,36 @@ export function TeacherHomeScreen({
       <ScreenHeader
         theme={theme}
         title="Кабинет преподавателя"
-        subtitle="Создавай лекции, управляй структурой курса, добавляй вопросы и запускай сессии."
-        rightSlot={
-          <View style={styles.headerRoleChip}>
-            <Text style={styles.headerRoleChipText}>Преподаватель</Text>
-          </View>
-        }
+        subtitle="Создавай лекции, управляй материалами, проверочными блоками и быстрыми сессиями."
       />
 
       <View style={styles.heroCard}>
-        <View style={styles.heroLeft}>
+        <View style={styles.heroMain}>
           <Text style={styles.heroEyebrow}>Рабочее пространство</Text>
           <Text style={styles.heroTitle}>{teacherDisplayName}</Text>
           <Text style={styles.heroSubtitle}>
-            Управляй лекциями, материалами и проверочными блоками из единого кабинета.
+            Всё важное в одном месте: создание лекций, редактор вопросов, запуск тестов и проверка результатов.
           </Text>
 
-          <View style={styles.quickInfoRow}>
+          <View style={styles.infoRow}>
             <InfoBadge theme={theme} label={fixText(`Логин: ${user.login}`)} />
             <InfoBadge theme={theme} label={fixText(`Группа: ${user.group}`)} />
           </View>
 
-          <View style={styles.heroActions}>
+          <View style={styles.heroActionRow}>
             <AppButton
               label="Выйти из аккаунта"
               onPress={onLogout}
               theme={theme}
-              variant="ghost"
+              variant="secondary"
               fullWidth={false}
-              style={styles.heroActionButton}
+              style={styles.inlineButton}
             />
           </View>
         </View>
 
         <View style={styles.heroStats}>
-          <StatTile theme={theme} value={String(lectures.length)} label="Всего лекций" />
+          <StatTile theme={theme} value={String(lectures.length)} label="Лекций" />
           <StatTile theme={theme} value={String(totalDraftLectures)} label="Черновиков" />
           <StatTile theme={theme} value={String(totalQuestions)} label="Вопросов" />
         </View>
@@ -333,9 +330,9 @@ export function TeacherHomeScreen({
       <View style={styles.dashboardRow}>
         <SectionCard
           theme={theme}
-          title="Быстрое создание лекции"
-          subtitle="Сначала создаём основу курса, потом открываем редактор и добавляем вопросы."
-          style={styles.dashboardCardWide}
+          title="Создать новую лекцию"
+          subtitle="Сначала создаём основу, потом открываем редактор и наполняем вопросами."
+          style={styles.dashboardWide}
         >
           <AppInput
             label="Название лекции"
@@ -366,8 +363,8 @@ export function TeacherHomeScreen({
             numberOfLines={8}
           />
 
-          <View style={styles.tripleRow}>
-            <View style={styles.tripleCol}>
+          <View style={styles.formRow}>
+            <View style={styles.formCol}>
               <AppInput
                 label="Предмет"
                 theme={theme}
@@ -377,7 +374,7 @@ export function TeacherHomeScreen({
               />
             </View>
 
-            <View style={styles.tripleCol}>
+            <View style={styles.formCol}>
               <AppInput
                 label="Семестр"
                 theme={theme}
@@ -387,7 +384,7 @@ export function TeacherHomeScreen({
               />
             </View>
 
-            <View style={styles.tripleCol}>
+            <View style={styles.formCol}>
               <AppInput
                 label="Уровень"
                 theme={theme}
@@ -422,28 +419,28 @@ export function TeacherHomeScreen({
         <SectionCard
           theme={theme}
           title="Фокус дня"
-          subtitle="Быстрый доступ к самым важным действиям преподавателя."
-          style={styles.dashboardCardNarrow}
+          subtitle="Быстрый доступ к главным действиям преподавателя."
+          style={styles.dashboardNarrow}
         >
           <ActionMiniCard
             theme={theme}
             title="Лекции"
-            subtitle="Открывай редактор и настраивай структуру."
+            subtitle="Открывай редактор и дополняй структуру курса."
           />
           <ActionMiniCard
             theme={theme}
             title="Сессии"
-            subtitle="Запускай занятие и переключай блоки."
+            subtitle="Запускай занятие и переключай учебные блоки."
           />
           <ActionMiniCard
             theme={theme}
-            title="Вопросы"
-            subtitle="Добавляй проверочные блоки к каждой лекции."
+            title="Тестирование"
+            subtitle="Делай быстрые проверочные тесты прямо на занятии."
           />
           <ActionMiniCard
             theme={theme}
-            title="LaTeX"
-            subtitle="Подготавливай материалы и PDF-версию курса."
+            title="Итоги"
+            subtitle="Смотри, кто уже сдал задания и как прошли проверки."
           />
         </SectionCard>
       </View>
@@ -451,7 +448,7 @@ export function TeacherHomeScreen({
       <SectionCard
         theme={theme}
         title="Лекции преподавателя"
-        subtitle="Ниже — все лекции. Можно запускать сессию, открыть редактор и управлять вопросами."
+        subtitle="Запуск сессии, редактор и управление вопросами — прямо из карточки лекции."
       >
         {lectures.length === 0 ? (
           <Text style={styles.emptyText}>Пока нет лекций. Создай первую лекцию выше.</Text>
@@ -462,16 +459,10 @@ export function TeacherHomeScreen({
             const videoValue = (lecture as LectureItem & { videoUrl?: string }).videoUrl ?? "";
 
             return (
-              <View
-                key={lecture.id}
-                style={[
-                  styles.lectureCard,
-                  isExpanded ? styles.lectureCardExpanded : null
-                ]}
-              >
-                <View style={styles.lectureCardTop}>
-                  <View style={styles.lectureCardText}>
-                    <View style={styles.cardBadgeRow}>
+              <View key={lecture.id} style={[styles.lectureCard, isExpanded ? styles.lectureCardExpanded : null]}>
+                <View style={styles.lectureHeader}>
+                  <View style={styles.lectureHeaderText}>
+                    <View style={styles.pillRow}>
                       <TinyPill theme={theme} label={fixText(lecture.subject)} tone="primary" />
                       <TinyPill theme={theme} label={fixText(lecture.level)} tone="neutral" />
                       {lecture.id.startsWith("draft-lecture-") ? (
@@ -481,23 +472,23 @@ export function TeacherHomeScreen({
 
                     <Text style={styles.lectureTitle}>{fixText(lecture.title)}</Text>
                     <Text style={styles.lectureMeta}>
-                      {fixText(lecture.subject)} • {fixText(lecture.semester)} • {fixText(lecture.level)}
+                      {fixText(`${lecture.subject} • ${lecture.semester} • ${lecture.level}`)}
                     </Text>
                     <Text style={styles.lectureDescription}>{fixText(lecture.description)}</Text>
-
-                    <View style={styles.metaPanel}>
-                      <MetaItem theme={theme} label="Блоков" value={String(lecture.blocks.length)} />
-                      <MetaItem theme={theme} label="Вопросов" value={String(questions.length)} />
-                      <MetaItem theme={theme} label="Длительность" value={fixText(lecture.estimatedDuration)} />
-                    </View>
-
-                    {videoValue ? (
-                      <Text style={styles.videoHint}>{fixText(`Видео: ${videoValue}`)}</Text>
-                    ) : null}
                   </View>
                 </View>
 
-                <View style={styles.actionRow}>
+                <View style={styles.metaPanel}>
+                  <MetaItem theme={theme} label="Блоков" value={String(lecture.blocks.length)} />
+                  <MetaItem theme={theme} label="Вопросов" value={String(questions.length)} />
+                  <MetaItem theme={theme} label="Длительность" value={fixText(lecture.estimatedDuration)} />
+                </View>
+
+                {videoValue ? (
+                  <Text style={styles.videoHint}>{fixText(`Видео: ${videoValue}`)}</Text>
+                ) : null}
+
+                <View style={styles.actionsRow}>
                   <AppButton
                     label="Запустить сессию"
                     onPress={() => onOpenManageSession(lecture)}
@@ -525,12 +516,12 @@ export function TeacherHomeScreen({
 
                 {isExpanded ? (
                   <View style={styles.editorShell}>
-                    <View style={styles.editorGrid}>
+                    <View style={styles.editorRow}>
                       <SectionCard
                         theme={theme}
                         title="Параметры лекции"
-                        subtitle="Редактируй основные метаданные и ссылку на видео."
-                        style={styles.innerCard}
+                        subtitle="Предмет, семестр, уровень и видеоматериал."
+                        style={styles.editorCard}
                       >
                         <AppInput
                           label="Предмет"
@@ -579,8 +570,8 @@ export function TeacherHomeScreen({
                       <SectionCard
                         theme={theme}
                         title="Теория лекции"
-                        subtitle="Сейчас здесь предпросмотр. Основной текст задаётся при создании лекции."
-                        style={styles.innerCard}
+                        subtitle="Предпросмотр основного материала."
+                        style={styles.editorCard}
                       >
                         <Text style={styles.theoryPreview}>
                           {fixText(expandedTheory || "Теория пока не добавлена.")}
@@ -588,12 +579,12 @@ export function TeacherHomeScreen({
                       </SectionCard>
                     </View>
 
-                    <View style={styles.editorGrid}>
+                    <View style={styles.editorRow}>
                       <SectionCard
                         theme={theme}
                         title="Добавить вопрос"
                         subtitle="Собери новый вопрос для проверочного блока."
-                        style={styles.innerCard}
+                        style={styles.editorCard}
                       >
                         <AppInput
                           label="Текст вопроса"
@@ -605,8 +596,8 @@ export function TeacherHomeScreen({
                           numberOfLines={3}
                         />
 
-                        <View style={styles.doubleRow}>
-                          <View style={styles.doubleCol}>
+                        <View style={styles.formRow}>
+                          <View style={styles.halfCol}>
                             <AppInput
                               label="Вариант A"
                               theme={theme}
@@ -615,7 +606,7 @@ export function TeacherHomeScreen({
                               placeholder="Первый вариант"
                             />
                           </View>
-                          <View style={styles.doubleCol}>
+                          <View style={styles.halfCol}>
                             <AppInput
                               label="Вариант B"
                               theme={theme}
@@ -626,8 +617,8 @@ export function TeacherHomeScreen({
                           </View>
                         </View>
 
-                        <View style={styles.doubleRow}>
-                          <View style={styles.doubleCol}>
+                        <View style={styles.formRow}>
+                          <View style={styles.halfCol}>
                             <AppInput
                               label="Вариант C"
                               theme={theme}
@@ -636,7 +627,7 @@ export function TeacherHomeScreen({
                               placeholder="Третий вариант"
                             />
                           </View>
-                          <View style={styles.doubleCol}>
+                          <View style={styles.halfCol}>
                             <AppInput
                               label="Вариант D"
                               theme={theme}
@@ -648,26 +639,33 @@ export function TeacherHomeScreen({
                         </View>
 
                         <Text style={styles.sectionLabel}>Правильный ответ</Text>
-                        <View style={styles.optionRow}>
-                          {(["A", "B", "C", "D"] as const).map((key) => (
-                            <Pressable
-                              key={key}
-                              onPress={() => setCorrectOptionKey(key)}
-                              style={[
-                                styles.answerChip,
-                                correctOptionKey === key ? styles.answerChipActive : null
-                              ]}
-                            >
-                              <Text
+                        <View style={styles.answerRow}>
+                          {(["A", "B", "C", "D"] as const).map((key) => {
+                            const isActive = correctOptionKey === key;
+
+                            return (
+                              <Pressable
+                                key={key}
+                                onPress={() => setCorrectOptionKey(key)}
                                 style={[
-                                  styles.answerChipText,
-                                  correctOptionKey === key ? styles.answerChipTextActive : null
+                                  styles.answerChip,
+                                  {
+                                    borderColor: isActive ? theme.colors.primary : theme.colors.border,
+                                    backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surface
+                                  }
                                 ]}
                               >
-                                {key}
-                              </Text>
-                            </Pressable>
-                          ))}
+                                <Text
+                                  style={[
+                                    styles.answerChipText,
+                                    { color: isActive ? theme.colors.primary : theme.colors.text }
+                                  ]}
+                                >
+                                  {key}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
                         </View>
 
                         <AppInput
@@ -694,8 +692,8 @@ export function TeacherHomeScreen({
                       <SectionCard
                         theme={theme}
                         title="Текущие вопросы"
-                        subtitle="Список вопросов для этой лекции."
-                        style={styles.innerCard}
+                        subtitle="Вопросы для этой лекции."
+                        style={styles.editorCard}
                       >
                         {expandedQuestions.length === 0 ? (
                           <Text style={styles.emptyText}>Пока нет вопросов.</Text>
@@ -721,7 +719,8 @@ export function TeacherHomeScreen({
                                 onPress={() => onDeleteDraftQuestion(lecture.id, question.id)}
                                 theme={theme}
                                 variant="secondary"
-                                style={styles.questionDeleteButton}
+                                fullWidth={false}
+                                style={styles.inlineButton}
                               />
                             </View>
                           ))
@@ -746,7 +745,7 @@ type StatTileProps = {
 };
 
 function StatTile({ theme, value, label }: StatTileProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.statTile}>
@@ -762,7 +761,7 @@ type InfoBadgeProps = {
 };
 
 function InfoBadge({ theme, label }: InfoBadgeProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.infoBadge}>
@@ -778,7 +777,7 @@ type TinyPillProps = {
 };
 
 function TinyPill({ theme, label, tone }: TinyPillProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View
@@ -809,7 +808,7 @@ type MetaItemProps = {
 };
 
 function MetaItem({ theme, label, value }: MetaItemProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.metaItem}>
@@ -826,7 +825,7 @@ type ActionMiniCardProps = {
 };
 
 function ActionMiniCard({ theme, title, subtitle }: ActionMiniCardProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.actionMiniCard}>
@@ -862,65 +861,51 @@ function getQuestions(details?: LectureDetails): QuizQuestion[] {
   return quizBlock.payload.questions;
 }
 
-function createStyles(theme: AppTheme) {
+function createStyles(theme: AppTheme, width: number) {
+  const isPhone = width < 560;
+  const isCompact = width < 980;
+
   return StyleSheet.create({
-    headerRoleChip: {
-      minHeight: 42,
-      paddingHorizontal: theme.spacing.md,
-      borderRadius: theme.radius.pill,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: theme.colors.surfaceMuted,
-      borderWidth: 1,
-      borderColor: theme.colors.border
-    },
-    headerRoleChipText: {
-      fontSize: theme.typography.caption,
-      fontWeight: "800",
-      color: theme.colors.text
-    },
     heroCard: {
-      flexDirection: "row",
-      flexWrap: "wrap",
+      flexDirection: isCompact ? "column" : "row",
       borderRadius: theme.radius.xl,
-      padding: theme.spacing.xl,
+      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.lg,
-      ...theme.shadow.lg
+      marginBottom: theme.spacing.lg
     },
-    heroLeft: {
+    heroMain: {
       flex: 1,
-      minWidth: 320,
-      paddingRight: theme.spacing.lg
+      paddingRight: isCompact ? 0 : theme.spacing.lg,
+      marginBottom: isCompact ? theme.spacing.md : 0
     },
     heroEyebrow: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.primary,
       marginBottom: theme.spacing.sm,
       textTransform: "uppercase",
-      letterSpacing: 0.4
+      letterSpacing: 0.3
     },
     heroTitle: {
-      fontSize: theme.typography.title,
-      lineHeight: theme.typography.title + 6,
-      fontWeight: "900",
+      fontSize: isPhone ? 24 : theme.typography.title,
+      lineHeight: isPhone ? 30 : theme.typography.title + 4,
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
     heroSubtitle: {
       fontSize: theme.typography.body,
-      lineHeight: 26,
+      lineHeight: 22,
       color: theme.colors.textSecondary,
-      maxWidth: 760,
-      marginBottom: theme.spacing.lg
+      marginBottom: theme.spacing.lg,
+      maxWidth: 760
     },
-    quickInfoRow: {
+    infoRow: {
       flexDirection: "row",
       flexWrap: "wrap",
-      marginBottom: theme.spacing.md
+      marginBottom: theme.spacing.sm
     },
     infoBadge: {
       minHeight: 34,
@@ -935,21 +920,15 @@ function createStyles(theme: AppTheme) {
     },
     infoBadgeText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
-    heroActions: {
+    heroActionRow: {
       flexDirection: "row",
       flexWrap: "wrap"
     },
-    heroActionButton: {
-      marginRight: theme.spacing.sm,
-      marginBottom: theme.spacing.sm
-    },
     heroStats: {
-      width: 260,
-      minWidth: 220,
-      justifyContent: "space-between"
+      width: isCompact ? "100%" : 250
     },
     statTile: {
       borderRadius: theme.radius.lg,
@@ -960,8 +939,8 @@ function createStyles(theme: AppTheme) {
       marginBottom: theme.spacing.sm
     },
     statValue: {
-      fontSize: 28,
-      fontWeight: "900",
+      fontSize: 26,
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -971,19 +950,15 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.textSecondary
     },
     dashboardRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginHorizontal: -theme.spacing.xs
+      flexDirection: isCompact ? "column" : "row",
+      alignItems: "stretch"
     },
-    dashboardCardWide: {
-      flexBasis: 760,
-      flexGrow: 1,
-      marginHorizontal: theme.spacing.xs
+    dashboardWide: {
+      flex: 1.2,
+      marginRight: isCompact ? 0 : theme.spacing.md
     },
-    dashboardCardNarrow: {
-      flexBasis: 320,
-      flexGrow: 1,
-      marginHorizontal: theme.spacing.xs
+    dashboardNarrow: {
+      flex: 0.8
     },
     actionMiniCard: {
       borderRadius: theme.radius.md,
@@ -995,7 +970,7 @@ function createStyles(theme: AppTheme) {
     },
     actionMiniTitle: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -1004,22 +979,17 @@ function createStyles(theme: AppTheme) {
       lineHeight: 18,
       color: theme.colors.textSecondary
     },
-    tripleRow: {
+    formRow: {
       flexDirection: "row",
       flexWrap: "wrap",
       marginHorizontal: -theme.spacing.xs
     },
-    tripleCol: {
+    formCol: {
       flexBasis: 220,
       flexGrow: 1,
       paddingHorizontal: theme.spacing.xs
     },
-    doubleRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginHorizontal: -theme.spacing.xs
-    },
-    doubleCol: {
+    halfCol: {
       flexBasis: 260,
       flexGrow: 1,
       paddingHorizontal: theme.spacing.xs
@@ -1039,25 +1009,28 @@ function createStyles(theme: AppTheme) {
       fontWeight: "700",
       marginTop: theme.spacing.xs
     },
+    emptyText: {
+      fontSize: theme.typography.body,
+      color: theme.colors.textSecondary
+    },
     lectureCard: {
       borderRadius: theme.radius.xl,
       padding: theme.spacing.lg,
+      backgroundColor: theme.colors.surfaceElevated,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surfaceElevated,
-      marginBottom: theme.spacing.md,
-      ...theme.shadow.md
+      marginBottom: theme.spacing.md
     },
     lectureCardExpanded: {
       borderColor: theme.colors.primary
     },
-    lectureCardTop: {
-      marginBottom: theme.spacing.md
+    lectureHeader: {
+      marginBottom: theme.spacing.sm
     },
-    lectureCardText: {
+    lectureHeaderText: {
       flex: 1
     },
-    cardBadgeRow: {
+    pillRow: {
       flexDirection: "row",
       flexWrap: "wrap",
       marginBottom: theme.spacing.md
@@ -1072,20 +1045,20 @@ function createStyles(theme: AppTheme) {
       marginBottom: theme.spacing.xs
     },
     tinyPillPrimary: {
-      backgroundColor: theme.colors.surfaceMuted,
-      borderColor: theme.colors.primary
+      backgroundColor: theme.colors.primarySoft,
+      borderColor: theme.colors.primarySoft
     },
     tinyPillNeutral: {
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surfaceMuted,
       borderColor: theme.colors.border
     },
     tinyPillSuccess: {
-      backgroundColor: theme.colors.surfaceMuted,
-      borderColor: theme.colors.success
+      backgroundColor: "#E6F4EA",
+      borderColor: "#E6F4EA"
     },
     tinyPillText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
     tinyPillTextPrimary: {
@@ -1096,8 +1069,8 @@ function createStyles(theme: AppTheme) {
     },
     lectureTitle: {
       fontSize: theme.typography.sectionTitle,
-      lineHeight: 28,
-      fontWeight: "900",
+      lineHeight: 26,
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
@@ -1109,18 +1082,18 @@ function createStyles(theme: AppTheme) {
     },
     lectureDescription: {
       fontSize: theme.typography.body,
-      lineHeight: 24,
-      color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.md
+      lineHeight: 22,
+      color: theme.colors.textSecondary
     },
     metaPanel: {
       flexDirection: "row",
       flexWrap: "wrap",
       marginHorizontal: -theme.spacing.xs,
+      marginTop: theme.spacing.md,
       marginBottom: theme.spacing.sm
     },
     metaItem: {
-      flexBasis: 140,
+      flexBasis: isPhone ? "100%" : 150,
       flexGrow: 1,
       padding: theme.spacing.md,
       marginHorizontal: theme.spacing.xs,
@@ -1138,16 +1111,18 @@ function createStyles(theme: AppTheme) {
     },
     metaItemValue: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
     videoHint: {
       fontSize: theme.typography.caption,
-      color: theme.colors.textSecondary
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.sm
     },
-    actionRow: {
+    actionsRow: {
       flexDirection: "row",
-      flexWrap: "wrap"
+      flexWrap: "wrap",
+      marginTop: theme.spacing.sm
     },
     inlineButton: {
       marginRight: theme.spacing.sm,
@@ -1159,25 +1134,22 @@ function createStyles(theme: AppTheme) {
       borderTopWidth: 1,
       borderTopColor: theme.colors.border
     },
-    editorGrid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginHorizontal: -theme.spacing.xs
+    editorRow: {
+      flexDirection: isCompact ? "column" : "row"
     },
-    innerCard: {
-      flexBasis: 420,
-      flexGrow: 1,
-      marginHorizontal: theme.spacing.xs
+    editorCard: {
+      flex: 1,
+      marginRight: isCompact ? 0 : theme.spacing.md
     },
     sectionLabel: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.sm
     },
     theoryPreview: {
       fontSize: theme.typography.body,
-      lineHeight: 25,
+      lineHeight: 24,
       color: theme.colors.text,
       borderRadius: theme.radius.md,
       backgroundColor: theme.colors.input,
@@ -1185,40 +1157,25 @@ function createStyles(theme: AppTheme) {
       borderColor: theme.colors.border,
       padding: theme.spacing.md
     },
-    optionRow: {
+    answerRow: {
       flexDirection: "row",
       flexWrap: "wrap",
       marginBottom: theme.spacing.md
     },
     answerChip: {
       minWidth: 56,
-      minHeight: 44,
+      minHeight: 42,
       paddingHorizontal: theme.spacing.md,
       borderRadius: theme.radius.pill,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
       alignItems: "center",
       justifyContent: "center",
       marginRight: theme.spacing.sm,
       marginBottom: theme.spacing.sm
     },
-    answerChipActive: {
-      borderColor: theme.colors.primary,
-      backgroundColor: theme.colors.surfaceMuted,
-      ...theme.shadow.sm
-    },
     answerChipText: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
-      color: theme.colors.text
-    },
-    answerChipTextActive: {
-      color: theme.colors.primary
-    },
-    emptyText: {
-      fontSize: theme.typography.body,
-      color: theme.colors.textSecondary
+      fontWeight: "700"
     },
     questionCard: {
       borderRadius: theme.radius.lg,
@@ -1230,8 +1187,8 @@ function createStyles(theme: AppTheme) {
     },
     questionTitle: {
       fontSize: theme.typography.body,
-      lineHeight: 24,
-      fontWeight: "800",
+      lineHeight: 22,
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
@@ -1247,9 +1204,6 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.textSecondary,
       marginTop: theme.spacing.sm,
       marginBottom: theme.spacing.sm
-    },
-    questionDeleteButton: {
-      alignSelf: "flex-start"
     }
   });
 }

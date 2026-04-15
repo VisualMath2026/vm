@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { AppButton } from "../components/ui/AppButton";
 import { AppInput } from "../components/ui/AppInput";
@@ -8,10 +8,10 @@ import { ScreenHeader } from "../components/ui/ScreenHeader";
 import { SectionCard } from "../components/ui/SectionCard";
 import { StatusPill } from "../components/ui/StatusPill";
 import type { HomeworkItem, HomeworkSubmissionItem } from "../storage/homeworkStorage";
+import type { TestingSubmission } from "../storage/testingStorage";
 import type { AppTheme } from "../theme";
 import { fixText } from "../utils/fixText";
 import type { TestingRunResult } from "./TestingScreen";
-import type { TestingSubmission } from "../storage/testingStorage";
 
 type GradesScreenProps = {
   theme: AppTheme;
@@ -37,6 +37,8 @@ type TeacherGradeRow = {
   avgScore: number | null;
 };
 
+type StatusTone = "success" | "warning" | "info" | "neutral";
+
 export function GradesScreen({
   theme,
   isTeacher,
@@ -48,7 +50,8 @@ export function GradesScreen({
   testingSubmissions,
   onGradeSubmission
 }: GradesScreenProps) {
-  const styles = createStyles(theme);
+  const { width } = useWindowDimensions();
+  const styles = createStyles(theme, width);
 
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
@@ -101,8 +104,6 @@ export function GradesScreen({
     return total / checked.length;
   }, [studentRows]);
 
-  const checkedTeacherRows = teacherRows.filter((row) => row.checkedSubmissions > 0).length;
-
   const testingAverage = useMemo(() => {
     if (testingResults.length === 0) {
       return null;
@@ -141,7 +142,7 @@ export function GradesScreen({
         title="Итоги"
         subtitle={
           isTeacher
-            ? "Сводка по домашним заданиям и отдельный раздел «Итоги по тестированию»."
+            ? "Журнал домашних заданий и результаты тестирования в classroom-стиле."
             : "Все оценки, комментарии и статусы проверки домашних заданий."
         }
         rightSlot={
@@ -154,15 +155,15 @@ export function GradesScreen({
       />
 
       <View style={styles.heroCard}>
-        <View style={styles.heroLeft}>
-          <Text style={styles.heroEyebrow}>Результаты</Text>
+        <View style={styles.heroMain}>
+          <Text style={styles.heroEyebrow}>Журнал результатов</Text>
           <Text style={styles.heroTitle}>
-            {isTeacher ? "Журнал итогов" : fixText(userName || userLogin)}
+            {isTeacher ? "Панель преподавателя" : fixText(userName || userLogin)}
           </Text>
           <Text style={styles.heroSubtitle}>
             {isTeacher
-              ? "Здесь собраны результаты по домашним заданиям и сохранённые итоги по тестированию."
-              : "Здесь отображаются статусы сдачи, выставленные оценки и комментарии преподавателя."}
+              ? "Проверяй домашние задания, отслеживай средние баллы и смотри рейтинг по тестированию."
+              : "Здесь отображаются твои статусы сдачи, оценки и комментарии преподавателя."}
           </Text>
           {errorText ? <Text style={styles.errorText}>{fixText(errorText)}</Text> : null}
         </View>
@@ -192,125 +193,123 @@ export function GradesScreen({
         <>
           <SectionCard
             theme={theme}
-            title="Сводка преподавателя"
-            subtitle="По каждому домашнему заданию можно сразу выставить оценку."
+            title="Домашние задания"
+            subtitle="Здесь можно быстро проверить сдачи и выставить оценки."
           >
             {teacherRows.length === 0 ? (
               <Text style={styles.emptyText}>Пока нет данных по домашним заданиям.</Text>
             ) : (
-              <View style={styles.cardList}>
-                {teacherRows.map((row) => (
-                  <View key={row.homework.id} style={styles.resultCard}>
-                    <View style={styles.resultTop}>
-                      <View style={styles.resultTextWrap}>
-                        <Text style={styles.resultTitle}>{fixText(row.homework.title)}</Text>
-                        <Text style={styles.resultMeta}>
-                          {fixText(`Дедлайн: ${formatDateTime(row.homework.dueAt)} • Макс. балл: ${row.homework.maxScore}`)}
-                        </Text>
-                      </View>
-
-                      <StatusPill
-                        theme={theme}
-                        label={row.checkedSubmissions > 0 ? "Есть проверки" : "Ожидает"}
-                        tone={row.checkedSubmissions > 0 ? "success" : "warning"}
-                      />
+              teacherRows.map((row) => (
+                <View key={row.homework.id} style={styles.resultCard}>
+                  <View style={styles.resultTop}>
+                    <View style={styles.resultTextWrap}>
+                      <Text style={styles.resultTitle}>{fixText(row.homework.title)}</Text>
+                      <Text style={styles.resultMeta}>
+                        {fixText(`Дедлайн: ${formatDateTime(row.homework.dueAt)} • Макс. балл: ${row.homework.maxScore}`)}
+                      </Text>
                     </View>
 
-                    <View style={styles.infoGrid}>
-                      <InfoTile theme={theme} label="Сдач" value={String(row.relatedSubmissions.length)} />
-                      <InfoTile theme={theme} label="Проверено" value={String(row.checkedSubmissions)} />
-                      <InfoTile
-                        theme={theme}
-                        label="Средний балл"
-                        value={row.avgScore !== null ? row.avgScore.toFixed(1) : "—"}
-                      />
-                      <InfoTile theme={theme} label="Макс. балл" value={String(row.homework.maxScore)} />
-                    </View>
+                    <StatusPill
+                      theme={theme}
+                      label={row.checkedSubmissions > 0 ? "Есть проверки" : "Ожидает"}
+                      tone={row.checkedSubmissions > 0 ? "success" : "warning"}
+                    />
+                  </View>
 
-                    {row.relatedSubmissions.length === 0 ? (
-                      <Text style={styles.emptyText}>По этому заданию пока нет сдач.</Text>
-                    ) : (
-                      row.relatedSubmissions.map((submission) => {
-                        const scoreValue =
-                          scoreDrafts[submission.id] ??
-                          (submission.score !== null ? String(submission.score) : "");
+                  <View style={styles.infoGrid}>
+                    <InfoTile theme={theme} label="Сдач" value={String(row.relatedSubmissions.length)} />
+                    <InfoTile theme={theme} label="Проверено" value={String(row.checkedSubmissions)} />
+                    <InfoTile
+                      theme={theme}
+                      label="Средний балл"
+                      value={row.avgScore !== null ? row.avgScore.toFixed(1) : "—"}
+                    />
+                    <InfoTile theme={theme} label="Макс. балл" value={String(row.homework.maxScore)} />
+                  </View>
 
-                        const commentValue =
-                          commentDrafts[submission.id] ??
-                          submission.teacherComment ??
-                          "";
+                  {row.relatedSubmissions.length === 0 ? (
+                    <Text style={styles.emptyText}>По этому заданию пока нет сдач.</Text>
+                  ) : (
+                    row.relatedSubmissions.map((submission) => {
+                      const scoreValue =
+                        scoreDrafts[submission.id] ??
+                        (submission.score !== null ? String(submission.score) : "");
 
-                        return (
-                          <View key={submission.id} style={styles.submissionCard}>
-                            <View style={styles.submissionTop}>
-                              <View style={styles.submissionTextWrap}>
-                                <Text style={styles.submissionTitle}>{fixText(submission.studentName)}</Text>
-                                <Text style={styles.submissionMeta}>{fixText(`Логин: ${submission.studentLogin}`)}</Text>
-                                <Text style={styles.submissionMeta}>{fixText(`Файл: ${submission.fileName}`)}</Text>
-                                <Text style={styles.submissionMeta}>{fixText(`Сдано: ${formatDateTime(submission.submittedAt)}`)}</Text>
-                              </View>
+                      const commentValue =
+                        commentDrafts[submission.id] ??
+                        submission.teacherComment ??
+                        "";
 
-                              <StatusPill
+                      return (
+                        <View key={submission.id} style={styles.submissionCard}>
+                          <View style={styles.submissionTop}>
+                            <View style={styles.submissionTextWrap}>
+                              <Text style={styles.submissionTitle}>{fixText(submission.studentName)}</Text>
+                              <Text style={styles.submissionMeta}>{fixText(`Логин: ${submission.studentLogin}`)}</Text>
+                              <Text style={styles.submissionMeta}>{fixText(`Файл: ${submission.fileName}`)}</Text>
+                              <Text style={styles.submissionMeta}>{fixText(`Сдано: ${formatDateTime(submission.submittedAt)}`)}</Text>
+                            </View>
+
+                            <StatusPill
+                              theme={theme}
+                              label={submission.score !== null ? "Проверено" : "Ожидает проверки"}
+                              tone={submission.score !== null ? "success" : "info"}
+                            />
+                          </View>
+
+                          <View style={styles.inputGrid}>
+                            <View style={styles.inputCol}>
+                              <AppInput
+                                label="Оценка"
                                 theme={theme}
-                                label={submission.score !== null ? "Проверено" : "Ожидает проверки"}
-                                tone={submission.score !== null ? "success" : "info"}
+                                value={scoreValue}
+                                onChangeText={(value) =>
+                                  setScoreDrafts((current) => ({
+                                    ...current,
+                                    [submission.id]: value
+                                  }))
+                                }
+                                placeholder={`0-${row.homework.maxScore}`}
+                                keyboardType="numeric"
                               />
                             </View>
 
-                            <View style={styles.inputGrid}>
-                              <View style={styles.inputCol}>
-                                <AppInput
-                                  label="Оценка"
-                                  theme={theme}
-                                  value={scoreValue}
-                                  onChangeText={(value) =>
-                                    setScoreDrafts((current) => ({
-                                      ...current,
-                                      [submission.id]: value
-                                    }))
-                                  }
-                                  placeholder={`0-${row.homework.maxScore}`}
-                                  keyboardType="numeric"
-                                />
-                              </View>
-
-                              <View style={styles.inputColWide}>
-                                <AppInput
-                                  label="Комментарий"
-                                  theme={theme}
-                                  value={commentValue}
-                                  onChangeText={(value) =>
-                                    setCommentDrafts((current) => ({
-                                      ...current,
-                                      [submission.id]: value
-                                    }))
-                                  }
-                                  placeholder="Комментарий преподавателя"
-                                />
-                              </View>
+                            <View style={styles.inputColWide}>
+                              <AppInput
+                                label="Комментарий"
+                                theme={theme}
+                                value={commentValue}
+                                onChangeText={(value) =>
+                                  setCommentDrafts((current) => ({
+                                    ...current,
+                                    [submission.id]: value
+                                  }))
+                                }
+                                placeholder="Комментарий преподавателя"
+                              />
                             </View>
-
-                            <AppButton
-                              label="Сохранить оценку"
-                              onPress={() => handleSaveGrade(submission, row.homework)}
-                              theme={theme}
-                              fullWidth={false}
-                              style={styles.inlineButton}
-                            />
                           </View>
-                        );
-                      })
-                    )}
-                  </View>
-                ))}
-              </View>
+
+                          <AppButton
+                            label="Сохранить оценку"
+                            onPress={() => handleSaveGrade(submission, row.homework)}
+                            theme={theme}
+                            fullWidth={false}
+                            style={styles.inlineButton}
+                          />
+                        </View>
+                      );
+                    })
+                  )}
+                </View>
+              ))
             )}
           </SectionCard>
 
           <SectionCard
             theme={theme}
             title="Итоги по тестированию"
-            subtitle="Сохранённые результаты экспресс-тестов преподавателя."
+            subtitle="Сохранённые результаты экспресс-тестов и рейтинг студентов."
           >
             {testingResults.length === 0 ? (
               <Text style={styles.emptyText}>Пока нет сохранённых результатов по тестированию.</Text>
@@ -325,73 +324,91 @@ export function GradesScreen({
                   />
                 </View>
 
-                <View style={styles.cardList}>
-                  {testingResults.map((item) => {
-                    const relatedTestingSubmissions = item.sessionId
-                      ? testingSubmissions.filter((submission) => submission.sessionId === item.sessionId)
-                      : [];
+                {testingResults.map((item) => {
+                  const relatedTestingSubmissions = item.sessionId
+                    ? testingSubmissions
+                        .filter((submission) => submission.sessionId === item.sessionId)
+                        .sort((left, right) => {
+                          if (right.percent !== left.percent) {
+                            return right.percent - left.percent;
+                          }
 
-                    return (
-                      <View key={item.id} style={styles.resultCard}>
-                        <View style={styles.resultTop}>
-                          <View style={styles.resultTextWrap}>
-                            <Text style={styles.resultTitle}>{fixText(item.title)}</Text>
-                            <Text style={styles.resultMeta}>
-                              {fixText(`Дата: ${formatDateTime(item.createdAt)} • Длительность: ${item.durationMin} мин`)}
-                            </Text>
-                          </View>
+                          if (right.correctCount !== left.correctCount) {
+                            return right.correctCount - left.correctCount;
+                          }
 
-                          <StatusPill
-                            theme={theme}
-                            label={`${item.percent}%`}
-                            tone={item.percent >= 70 ? "success" : item.percent >= 40 ? "warning" : "neutral"}
-                          />
+                          return (
+                            new Date(left.submittedAt).getTime() - new Date(right.submittedAt).getTime()
+                          );
+                        })
+                    : [];
+
+                  return (
+                    <View key={item.id} style={styles.resultCard}>
+                      <View style={styles.resultTop}>
+                        <View style={styles.resultTextWrap}>
+                          <Text style={styles.resultTitle}>{fixText(item.title)}</Text>
+                          <Text style={styles.resultMeta}>
+                            {fixText(`Дата: ${formatDateTime(item.createdAt)} • Длительность: ${item.durationMin} мин`)}
+                          </Text>
                         </View>
 
-                        <View style={styles.infoGrid}>
-                          <InfoTile theme={theme} label="Правильных" value={String(item.correctCount)} />
-                          <InfoTile theme={theme} label="Ошибок" value={String(item.wrongCount)} />
-                          <InfoTile theme={theme} label="Пропусков" value={String(item.skippedCount)} />
-                          <InfoTile theme={theme} label="Всего вопросов" value={String(item.totalQuestions)} />
-                        </View>
-
-                        <Text style={styles.teacherSubmissionsTitle}>Студенты и оценки</Text>
-
-                        {relatedTestingSubmissions.length === 0 ? (
-                          <Text style={styles.emptyText}>Пока нет сохранённых результатов студентов по этому тесту.</Text>
-                        ) : (
-                          relatedTestingSubmissions.map((submission) => (
-                            <View key={submission.id} style={styles.submissionCard}>
-                              <View style={styles.submissionTop}>
-                                <View style={styles.submissionTextWrap}>
-                                  <Text style={styles.submissionTitle}>{fixText(submission.studentName)}</Text>
-                                  <Text style={styles.submissionMeta}>
-                                    {fixText(`Логин: ${submission.studentLogin}`)}
-                                  </Text>
-                                  <Text style={styles.submissionMeta}>
-                                    {fixText(`Результат: ${submission.correctCount}/${submission.totalQuestions} (${submission.percent}%)`)}
-                                  </Text>
-                                  <Text style={styles.submissionMeta}>
-                                    {fixText(`Ошибок: ${submission.wrongCount} • Пропусков: ${submission.skippedCount}`)}
-                                  </Text>
-                                  <Text style={styles.submissionMeta}>
-                                    {fixText(`Отправлено: ${formatDateTime(submission.submittedAt)}`)}
-                                  </Text>
-                                </View>
-
-                                <StatusPill
-                                  theme={theme}
-                                  label={`${submission.percent}%`}
-                                  tone={submission.percent >= 70 ? "success" : submission.percent >= 40 ? "warning" : "neutral"}
-                                />
-                              </View>
-                            </View>
-                          ))
-                        )}
+                        <StatusPill
+                          theme={theme}
+                          label={`${item.percent}%`}
+                          tone={item.percent >= 70 ? "success" : item.percent >= 40 ? "warning" : "neutral"}
+                        />
                       </View>
-                    );
-                  })}
-                </View>
+
+                      <View style={styles.infoGrid}>
+                        <InfoTile theme={theme} label="Правильных" value={String(item.correctCount)} />
+                        <InfoTile theme={theme} label="Ошибок" value={String(item.wrongCount)} />
+                        <InfoTile theme={theme} label="Пропусков" value={String(item.skippedCount)} />
+                        <InfoTile theme={theme} label="Всего вопросов" value={String(item.totalQuestions)} />
+                        <InfoTile theme={theme} label="Студентов" value={String(relatedTestingSubmissions.length)} />
+                      </View>
+
+                      <Text style={styles.teacherSubmissionsTitle}>Рейтинг студентов</Text>
+
+                      {relatedTestingSubmissions.length === 0 ? (
+                        <Text style={styles.emptyText}>Пока нет сохранённых результатов студентов по этому тесту.</Text>
+                      ) : (
+                        relatedTestingSubmissions.map((submission, index) => (
+                          <View key={submission.id} style={styles.submissionCard}>
+                            <View style={styles.submissionTop}>
+                              <View style={styles.submissionTextWrap}>
+                                <Text style={styles.submissionTitle}>
+                                  {fixText(`${index + 1}. ${submission.studentName}`)}
+                                </Text>
+                                <Text style={styles.submissionMeta}>
+                                  {fixText(`Логин: ${submission.studentLogin}`)}
+                                </Text>
+                                <Text style={styles.submissionMeta}>
+                                  {fixText(`Место: ${index + 1} из ${relatedTestingSubmissions.length}`)}
+                                </Text>
+                                <Text style={styles.submissionMeta}>
+                                  {fixText(`Результат: ${submission.correctCount}/${submission.totalQuestions} (${submission.percent}%)`)}
+                                </Text>
+                                <Text style={styles.submissionMeta}>
+                                  {fixText(`Ошибок: ${submission.wrongCount} • Пропусков: ${submission.skippedCount}`)}
+                                </Text>
+                                <Text style={styles.submissionMeta}>
+                                  {fixText(`Отправлено: ${formatDateTime(submission.submittedAt)}`)}
+                                </Text>
+                              </View>
+
+                              <StatusPill
+                                theme={theme}
+                                label={index === 0 ? `Лидер • ${submission.percent}%` : `${submission.percent}%`}
+                                tone={submission.percent >= 70 ? "success" : submission.percent >= 40 ? "warning" : "neutral"}
+                              />
+                            </View>
+                          </View>
+                        ))
+                      )}
+                    </View>
+                  );
+                })}
               </>
             )}
           </SectionCard>
@@ -405,57 +422,55 @@ export function GradesScreen({
           {studentRows.length === 0 ? (
             <Text style={styles.emptyText}>Пока нет данных по домашним заданиям.</Text>
           ) : (
-            <View style={styles.cardList}>
-              {studentRows.map((row) => (
-                <View key={row.homework.id} style={styles.resultCard}>
-                  <View style={styles.resultTop}>
-                    <View style={styles.resultTextWrap}>
-                      <Text style={styles.resultTitle}>{fixText(row.homework.title)}</Text>
-                      <Text style={styles.resultMeta}>
-                        {fixText(`Дедлайн: ${formatDateTime(row.homework.dueAt)} • Макс. балл: ${row.homework.maxScore}`)}
-                      </Text>
-                    </View>
-
-                    <StatusPill
-                      theme={theme}
-                      label={studentStatusLabel(row)}
-                      tone={studentStatusTone(row)}
-                    />
-                  </View>
-
-                  <View style={styles.infoGrid}>
-                    <InfoTile
-                      theme={theme}
-                      label="Оценка"
-                      value={row.submission?.score !== null && row.submission?.score !== undefined ? String(row.submission.score) : "—"}
-                    />
-                    <InfoTile
-                      theme={theme}
-                      label="Сдано"
-                      value={row.submission ? formatDateTime(row.submission.submittedAt) : "—"}
-                    />
-                    <InfoTile
-                      theme={theme}
-                      label="Файл"
-                      value={row.submission?.fileName ?? "—"}
-                    />
-                    <InfoTile
-                      theme={theme}
-                      label="Макс. балл"
-                      value={String(row.homework.maxScore)}
-                    />
-                  </View>
-
-                  {row.submission?.teacherComment ? (
-                    <Text style={styles.commentText}>{fixText(row.submission.teacherComment)}</Text>
-                  ) : (
-                    <Text style={styles.commentText}>
-                      {row.submission ? "Комментарий преподавателя пока не добавлен." : "Работа ещё не была сдана."}
+            studentRows.map((row) => (
+              <View key={row.homework.id} style={styles.resultCard}>
+                <View style={styles.resultTop}>
+                  <View style={styles.resultTextWrap}>
+                    <Text style={styles.resultTitle}>{fixText(row.homework.title)}</Text>
+                    <Text style={styles.resultMeta}>
+                      {fixText(`Дедлайн: ${formatDateTime(row.homework.dueAt)} • Макс. балл: ${row.homework.maxScore}`)}
                     </Text>
-                  )}
+                  </View>
+
+                  <StatusPill
+                    theme={theme}
+                    label={studentStatusLabel(row)}
+                    tone={studentStatusTone(row)}
+                  />
                 </View>
-              ))}
-            </View>
+
+                <View style={styles.infoGrid}>
+                  <InfoTile
+                    theme={theme}
+                    label="Оценка"
+                    value={row.submission?.score !== null && row.submission?.score !== undefined ? String(row.submission.score) : "—"}
+                  />
+                  <InfoTile
+                    theme={theme}
+                    label="Сдано"
+                    value={row.submission ? formatDateTime(row.submission.submittedAt) : "—"}
+                  />
+                  <InfoTile
+                    theme={theme}
+                    label="Файл"
+                    value={row.submission?.fileName ?? "—"}
+                  />
+                  <InfoTile
+                    theme={theme}
+                    label="Макс. балл"
+                    value={String(row.homework.maxScore)}
+                  />
+                </View>
+
+                {row.submission?.teacherComment ? (
+                  <Text style={styles.commentText}>{fixText(row.submission.teacherComment)}</Text>
+                ) : (
+                  <Text style={styles.commentText}>
+                    {row.submission ? "Комментарий преподавателя пока не добавлен." : "Работа ещё не была сдана."}
+                  </Text>
+                )}
+              </View>
+            ))
           )}
         </SectionCard>
       )}
@@ -470,7 +485,7 @@ type MiniStatCardProps = {
 };
 
 function MiniStatCard({ theme, value, label }: MiniStatCardProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.miniStatCard}>
@@ -487,7 +502,7 @@ type InfoTileProps = {
 };
 
 function InfoTile({ theme, label, value }: InfoTileProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.infoTile}>
@@ -513,7 +528,7 @@ function studentStatusLabel(row: StudentGradeRow): string {
   return "Активно";
 }
 
-function studentStatusTone(row: StudentGradeRow) {
+function studentStatusTone(row: StudentGradeRow): StatusTone {
   if (row.submission?.score !== null && row.submission?.score !== undefined) {
     return "success";
   }
@@ -545,70 +560,69 @@ function formatDateTime(value: string): string {
   });
 }
 
-function createStyles(theme: AppTheme) {
+function createStyles(theme: AppTheme, width: number) {
+  const isPhone = width < 560;
+  const isCompact = width < 980;
+
   return StyleSheet.create({
     headerChip: {
-      minHeight: 42,
+      minHeight: 38,
       paddingHorizontal: theme.spacing.md,
       borderRadius: theme.radius.pill,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.primarySoft,
       borderWidth: 1,
-      borderColor: theme.colors.border
+      borderColor: theme.colors.primarySoft
     },
     headerChipText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
-      color: theme.colors.text
+      fontWeight: "700",
+      color: theme.colors.primary
     },
     heroCard: {
-      flexDirection: "row",
-      flexWrap: "wrap",
+      flexDirection: isCompact ? "column" : "row",
       borderRadius: theme.radius.xl,
-      padding: theme.spacing.xl,
+      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.lg,
-      ...theme.shadow.lg
+      marginBottom: theme.spacing.lg
     },
-    heroLeft: {
+    heroMain: {
       flex: 1,
-      minWidth: 320,
-      paddingRight: theme.spacing.lg
+      paddingRight: isCompact ? 0 : theme.spacing.lg,
+      marginBottom: isCompact ? theme.spacing.md : 0
     },
     heroEyebrow: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.primary,
       marginBottom: theme.spacing.sm,
       textTransform: "uppercase",
-      letterSpacing: 0.4
+      letterSpacing: 0.3
     },
     heroTitle: {
-      fontSize: theme.typography.title,
-      lineHeight: theme.typography.title + 6,
-      fontWeight: "900",
+      fontSize: isPhone ? 24 : theme.typography.title,
+      lineHeight: isPhone ? 30 : theme.typography.title + 4,
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
     heroSubtitle: {
       fontSize: theme.typography.body,
-      lineHeight: 26,
+      lineHeight: 22,
       color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.lg,
       maxWidth: 760
     },
     errorText: {
+      marginTop: theme.spacing.sm,
       fontSize: theme.typography.caption,
       fontWeight: "700",
       color: theme.colors.danger
     },
     heroStats: {
-      width: 260,
-      minWidth: 220,
-      justifyContent: "space-between"
+      width: isCompact ? "100%" : 250
     },
     miniStatCard: {
       borderRadius: theme.radius.lg,
@@ -620,7 +634,7 @@ function createStyles(theme: AppTheme) {
     },
     miniStatValue: {
       fontSize: 24,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -633,32 +647,28 @@ function createStyles(theme: AppTheme) {
       fontSize: theme.typography.body,
       color: theme.colors.textSecondary
     },
-    cardList: {
-      width: "100%"
-    },
     resultCard: {
       borderRadius: theme.radius.xl,
       padding: theme.spacing.lg,
       backgroundColor: theme.colors.surfaceElevated,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.md,
-      ...theme.shadow.md
+      marginBottom: theme.spacing.md
     },
     resultTop: {
-      flexDirection: "row",
+      flexDirection: isPhone ? "column" : "row",
       justifyContent: "space-between",
-      alignItems: "flex-start",
-      flexWrap: "wrap",
+      alignItems: isPhone ? "stretch" : "flex-start",
       marginBottom: theme.spacing.md
     },
     resultTextWrap: {
       flex: 1,
-      paddingRight: theme.spacing.md
+      paddingRight: isPhone ? 0 : theme.spacing.md,
+      marginBottom: isPhone ? theme.spacing.sm : 0
     },
     resultTitle: {
       fontSize: theme.typography.sectionTitle,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -674,7 +684,7 @@ function createStyles(theme: AppTheme) {
       marginBottom: theme.spacing.sm
     },
     infoTile: {
-      flexBasis: 220,
+      flexBasis: isPhone ? "100%" : 210,
       flexGrow: 1,
       marginHorizontal: theme.spacing.xs,
       marginBottom: theme.spacing.sm,
@@ -692,21 +702,21 @@ function createStyles(theme: AppTheme) {
     },
     infoTileValue: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
     commentText: {
       fontSize: theme.typography.body,
-      lineHeight: 24,
+      lineHeight: 22,
       color: theme.colors.textSecondary
-    },    teacherSubmissionsTitle: {
+    },
+    teacherSubmissionsTitle: {
       fontSize: theme.typography.sectionTitle,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginTop: theme.spacing.md,
       marginBottom: theme.spacing.md
     },
-
     submissionCard: {
       borderRadius: theme.radius.lg,
       padding: theme.spacing.md,
@@ -716,19 +726,19 @@ function createStyles(theme: AppTheme) {
       marginTop: theme.spacing.md
     },
     submissionTop: {
-      flexDirection: "row",
+      flexDirection: isPhone ? "column" : "row",
       justifyContent: "space-between",
-      alignItems: "flex-start",
-      flexWrap: "wrap",
+      alignItems: isPhone ? "stretch" : "flex-start",
       marginBottom: theme.spacing.md
     },
     submissionTextWrap: {
       flex: 1,
-      paddingRight: theme.spacing.md
+      paddingRight: isPhone ? 0 : theme.spacing.md,
+      marginBottom: isPhone ? theme.spacing.sm : 0
     },
     submissionTitle: {
       fontSize: theme.typography.body,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -744,12 +754,12 @@ function createStyles(theme: AppTheme) {
       marginHorizontal: -theme.spacing.xs
     },
     inputCol: {
-      flexBasis: 180,
+      flexBasis: isPhone ? "100%" : 180,
       flexGrow: 1,
       paddingHorizontal: theme.spacing.xs
     },
     inputColWide: {
-      flexBasis: 360,
+      flexBasis: isPhone ? "100%" : 360,
       flexGrow: 1,
       paddingHorizontal: theme.spacing.xs
     },

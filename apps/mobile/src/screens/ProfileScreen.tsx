@@ -1,5 +1,5 @@
-﻿import React, { useMemo } from "react";
-import { StyleSheet, Switch, Text, View } from "react-native";
+import React, { useMemo } from "react";
+import { StyleSheet, Switch, Text, View, useWindowDimensions } from "react-native";
 
 import { AppButton } from "../components/ui/AppButton";
 import { Screen } from "../components/ui/Screen";
@@ -11,6 +11,7 @@ import type { AppTheme, ThemeMode } from "../theme";
 import { fixText } from "../utils/fixText";
 
 type DemoDataMode = "online" | "offline" | "loading" | "error";
+type StatusTone = "success" | "warning" | "info" | "danger";
 
 type ProfileScreenProps = {
   theme: AppTheme;
@@ -39,7 +40,8 @@ export function ProfileScreen({
   onCycleSessionMode,
   onLogout
 }: ProfileScreenProps) {
-  const styles = createStyles(theme);
+  const { width } = useWindowDimensions();
+  const styles = createStyles(theme, width);
 
   const displayName = useMemo(() => {
     const next = fixText(user.fullName || "").trim();
@@ -68,7 +70,7 @@ export function ProfileScreen({
       <ScreenHeader
         theme={theme}
         title="Профиль и настройки"
-        subtitle="Управляй своим аккаунтом, переключай режимы интерфейса и проверяй demo-состояния приложения."
+        subtitle="Управляй аккаунтом, параметрами интерфейса и demo-состояниями приложения."
         rightSlot={
           <View style={styles.roleChip}>
             <Text style={styles.roleChipText}>{roleLabel}</Text>
@@ -83,6 +85,7 @@ export function ProfileScreen({
           </View>
 
           <View style={styles.heroTextBlock}>
+            <Text style={styles.heroEyebrow}>Личный кабинет</Text>
             <Text style={styles.heroName}>{displayName}</Text>
             <Text style={styles.heroSubtitle}>
               Личный кабинет пользователя платформы VisualMath.
@@ -139,7 +142,7 @@ export function ProfileScreen({
           subtitle="Состояние ключевых частей приложения."
           style={styles.cardNarrow}
         >
-          <View style={styles.statusRow}>
+          <View style={styles.statusWrap}>
             <StatusPill
               theme={theme}
               label={`Каталог: ${catalogMode}`}
@@ -231,7 +234,7 @@ type MiniStatCardProps = {
 };
 
 function MiniStatCard({ theme, value, label }: MiniStatCardProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.miniStatCard}>
@@ -248,7 +251,7 @@ type InfoTileProps = {
 };
 
 function InfoTile({ theme, label, value }: InfoTileProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.infoTile}>
@@ -273,7 +276,7 @@ function SettingRow({
   value,
   onValueChange
 }: SettingRowProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.settingRow}>
@@ -294,7 +297,7 @@ function SettingRow({
   );
 }
 
-function mapModeToTone(mode: DemoDataMode) {
+function mapModeToTone(mode: DemoDataMode): StatusTone {
   if (mode === "online") {
     return "success";
   }
@@ -310,69 +313,79 @@ function mapModeToTone(mode: DemoDataMode) {
   return "danger";
 }
 
-function createStyles(theme: AppTheme) {
+function createStyles(theme: AppTheme, width: number) {
+  const isPhone = width < 560;
+  const isCompact = width < 980;
+
   return StyleSheet.create({
     roleChip: {
-      minHeight: 42,
+      minHeight: 38,
       paddingHorizontal: theme.spacing.md,
       borderRadius: theme.radius.pill,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.primarySoft,
       borderWidth: 1,
-      borderColor: theme.colors.border
+      borderColor: theme.colors.primarySoft
     },
     roleChipText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
-      color: theme.colors.text
+      fontWeight: "700",
+      color: theme.colors.primary
     },
     heroCard: {
-      flexDirection: "row",
-      flexWrap: "wrap",
+      flexDirection: isCompact ? "column" : "row",
       borderRadius: theme.radius.xl,
-      padding: theme.spacing.xl,
+      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.lg,
-      ...theme.shadow.lg
+      marginBottom: theme.spacing.lg
     },
     heroLeft: {
       flex: 1,
       minWidth: 320,
-      flexDirection: "row",
-      alignItems: "center",
-      paddingRight: theme.spacing.lg
+      flexDirection: isPhone ? "column" : "row",
+      alignItems: isPhone ? "flex-start" : "center",
+      paddingRight: isCompact ? 0 : theme.spacing.lg,
+      marginBottom: isCompact ? theme.spacing.md : 0
     },
     avatar: {
-      width: 104,
-      height: 104,
+      width: 96,
+      height: 96,
       borderRadius: 999,
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: theme.colors.primary,
-      marginRight: theme.spacing.lg,
-      ...theme.shadow.md
+      marginRight: isPhone ? 0 : theme.spacing.lg,
+      marginBottom: isPhone ? theme.spacing.md : 0
     },
     avatarText: {
-      fontSize: 32,
-      fontWeight: "900",
+      fontSize: 30,
+      fontWeight: "700",
       color: "#FFFFFF"
     },
     heroTextBlock: {
       flex: 1
     },
+    heroEyebrow: {
+      fontSize: theme.typography.caption,
+      fontWeight: "700",
+      color: theme.colors.primary,
+      marginBottom: theme.spacing.sm,
+      textTransform: "uppercase",
+      letterSpacing: 0.3
+    },
     heroName: {
-      fontSize: theme.typography.title,
-      lineHeight: theme.typography.title + 6,
-      fontWeight: "900",
+      fontSize: isPhone ? 24 : theme.typography.title,
+      lineHeight: isPhone ? 30 : theme.typography.title + 4,
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
     heroSubtitle: {
       fontSize: theme.typography.body,
-      lineHeight: 24,
+      lineHeight: 22,
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.md
     },
@@ -393,13 +406,11 @@ function createStyles(theme: AppTheme) {
     },
     infoBadgeText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
     heroStats: {
-      width: 260,
-      minWidth: 220,
-      justifyContent: "space-between"
+      width: isCompact ? "100%" : 260
     },
     miniStatCard: {
       borderRadius: theme.radius.lg,
@@ -411,7 +422,7 @@ function createStyles(theme: AppTheme) {
     },
     miniStatValue: {
       fontSize: 24,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -421,19 +432,14 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.textSecondary
     },
     grid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginHorizontal: -theme.spacing.xs
+      flexDirection: isCompact ? "column" : "row"
     },
     cardWide: {
-      flexBasis: 720,
-      flexGrow: 1,
-      marginHorizontal: theme.spacing.xs
+      flex: 1.2,
+      marginRight: isCompact ? 0 : theme.spacing.md
     },
     cardNarrow: {
-      flexBasis: 320,
-      flexGrow: 1,
-      marginHorizontal: theme.spacing.xs
+      flex: 0.8
     },
     infoGrid: {
       flexDirection: "row",
@@ -441,7 +447,7 @@ function createStyles(theme: AppTheme) {
       marginHorizontal: -theme.spacing.xs
     },
     infoTile: {
-      flexBasis: 220,
+      flexBasis: isPhone ? "100%" : 220,
       flexGrow: 1,
       marginHorizontal: theme.spacing.xs,
       marginBottom: theme.spacing.sm,
@@ -459,10 +465,10 @@ function createStyles(theme: AppTheme) {
     },
     infoTileValue: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
-    statusRow: {
+    statusWrap: {
       flexDirection: "row",
       flexWrap: "wrap"
     },
@@ -477,7 +483,7 @@ function createStyles(theme: AppTheme) {
     },
     settingTitle: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },

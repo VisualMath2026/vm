@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { StyleSheet, Text, View, useWindowDimensions } from "react-native";
 
 import { fixText } from "../../utils/fixText";
@@ -35,31 +35,29 @@ export function ScreenHeader({
 }
 
 function createStyles(theme: AppTheme, width: number) {
+  const isPhone = width < 560;
   const isCompact = width < 820;
-  const isPhone = width < 480;
-  const titleSize = isPhone ? 24 : isCompact ? 24 : theme.typography.screenTitle;
 
   return StyleSheet.create({
     wrapper: {
-      marginBottom: isPhone ? theme.spacing.lg : theme.spacing.xl
+      marginBottom: theme.spacing.lg
     },
     row: {
       flexDirection: isCompact ? "column" : "row",
       justifyContent: "space-between",
-      alignItems: "flex-start",
+      alignItems: isCompact ? "stretch" : "flex-start",
       gap: theme.spacing.md
     },
     textBlock: {
       flex: 1,
-      maxWidth: isCompact ? undefined : 860
+      maxWidth: 760
     },
     title: {
-      fontSize: titleSize,
-      lineHeight: titleSize + 6,
-      fontWeight: "800",
+      fontSize: isPhone ? 22 : theme.typography.screenTitle,
+      lineHeight: isPhone ? 28 : theme.typography.screenTitle + 4,
+      fontWeight: "700",
       color: theme.colors.text,
-      marginBottom: theme.spacing.xs,
-      letterSpacing: -0.3
+      marginBottom: theme.spacing.xs
     },
     subtitle: {
       fontSize: theme.typography.body,
@@ -67,8 +65,7 @@ function createStyles(theme: AppTheme, width: number) {
       color: theme.colors.textSecondary
     },
     rightSlot: {
-      width: isCompact ? "100%" : undefined,
-      marginTop: isCompact ? 0 : theme.spacing.xs
+      alignSelf: isCompact ? "flex-start" : "auto"
     }
   });
 }

@@ -1,10 +1,11 @@
-﻿import React from "react";
+import React from "react";
 import {
   Linking,
   Pressable,
   StyleSheet,
   Text,
-  View
+  View,
+  useWindowDimensions
 } from "react-native";
 import type {
   LectureBlock,
@@ -39,7 +40,9 @@ export function LectureDetailsScreen({
   onBack,
   onOpenSession
 }: LectureDetailsScreenProps) {
-  const styles = createStyles(theme);
+  const { width } = useWindowDimensions();
+  const styles = createStyles(theme, width);
+
   const videoUrl = String((lecture as { videoUrl?: string }).videoUrl ?? "").trim();
   const blocks = lectureDetails?.blocks ?? [];
   const requirements = fixTextList(
@@ -86,7 +89,7 @@ export function LectureDetailsScreen({
 
           <View style={styles.heroActions}>
             <AppButton
-              label="Открыть занятие"
+              label="Начать занятие"
               onPress={onOpenSession}
               theme={theme}
               fullWidth={false}
@@ -109,11 +112,7 @@ export function LectureDetailsScreen({
             value={String(blocks.length > 0 ? blocks.length : lecture.blocks.length)}
             label="Блоков"
           />
-          <MiniStatCard
-            theme={theme}
-            value={String(lecture.tags.length)}
-            label="Тегов"
-          />
+          <MiniStatCard theme={theme} value={String(lecture.tags.length)} label="Тегов" />
           <MiniStatCard
             theme={theme}
             value={fixText(lecture.id.startsWith("draft-lecture-") ? "Черновик" : lecture.author)}
@@ -130,10 +129,18 @@ export function LectureDetailsScreen({
           style={styles.cardWide}
         >
           <View style={styles.infoGrid}>
-            <InfoTile theme={theme} label="Автор" value={lecture.id.startsWith("draft-lecture-") ? "Visual Math Team" : lecture.author} />
+            <InfoTile
+              theme={theme}
+              label="Автор"
+              value={lecture.id.startsWith("draft-lecture-") ? "Visual Math Team" : lecture.author}
+            />
             <InfoTile theme={theme} label="Семестр" value={lecture.semester} />
             <InfoTile theme={theme} label="Предмет" value={lecture.subject} />
-            <InfoTile theme={theme} label="Длительность" value={lecture.id.startsWith("draft-lecture-") ? "15 минут" : lecture.estimatedDuration} />
+            <InfoTile
+              theme={theme}
+              label="Длительность"
+              value={lecture.id.startsWith("draft-lecture-") ? "15 минут" : lecture.estimatedDuration}
+            />
           </View>
 
           <Text style={styles.sectionText}>
@@ -143,7 +150,7 @@ export function LectureDetailsScreen({
 
         <SectionCard
           theme={theme}
-          title="Требования и подготовка"
+          title="Подготовка"
           subtitle="Что желательно знать перед открытием занятия."
           style={styles.cardNarrow}
         >
@@ -191,13 +198,17 @@ export function LectureDetailsScreen({
           </View>
         ) : (
           <View style={styles.blockList}>
-            {fixTextList(lecture.id.startsWith("draft-lecture-") ? ["Theory", "Questions"] : lecture.blocks).map((block, index) => (
+            {fixTextList(
+              lecture.id.startsWith("draft-lecture-") ? ["Theory", "Questions"] : lecture.blocks
+            ).map((block, index) => (
               <View key={`${block}-${index}`} style={styles.blockSummaryCard}>
                 <View style={styles.blockSummaryTop}>
                   <Text style={styles.blockIndex}>Блок {index + 1}</Text>
                 </View>
                 <Text style={styles.blockTitle}>{fixText(block)}</Text>
-                <Text style={styles.blockSummaryText}>Блок будет детализирован после загрузки данных лекции.</Text>
+                <Text style={styles.blockSummaryText}>
+                  Блок будет детализирован после загрузки данных лекции.
+                </Text>
               </View>
             ))}
           </View>
@@ -228,11 +239,13 @@ type MiniStatCardProps = {
 };
 
 function MiniStatCard({ theme, value, label }: MiniStatCardProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.miniStatCard}>
-      <Text numberOfLines={2} style={styles.miniStatValue}>{fixText(value)}</Text>
+      <Text numberOfLines={2} style={styles.miniStatValue}>
+        {fixText(value)}
+      </Text>
       <Text style={styles.miniStatLabel}>{fixText(label)}</Text>
     </View>
   );
@@ -245,7 +258,7 @@ type InfoTileProps = {
 };
 
 function InfoTile({ theme, label, value }: InfoTileProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.infoTile}>
@@ -261,7 +274,7 @@ type BlockSummaryProps = {
 };
 
 function BlockSummary({ theme, block }: BlockSummaryProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   if (block.type === "text") {
     const textBlock = block as TextBlock;
@@ -301,7 +314,7 @@ type BlockPreviewProps = {
 };
 
 function BlockPreview({ theme, block, index }: BlockPreviewProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   if (block.type === "text") {
     const textBlock = block as TextBlock;
@@ -317,7 +330,10 @@ function BlockPreview({ theme, block, index }: BlockPreviewProps) {
         subtitle={fixText(block.title || "Текстовый материал лекции")}
       >
         {lines.slice(0, 5).map((line, lineIndex) => (
-          <Text key={`${line}-${lineIndex}`} style={line.startsWith("-") ? styles.listItem : styles.previewTextLine}>
+          <Text
+            key={`${line}-${lineIndex}`}
+            style={line.startsWith("-") ? styles.listItem : styles.previewTextLine}
+          >
             {line.startsWith("-") ? `• ${fixText(line.replace(/^-+\s*/, ""))}` : fixText(line)}
           </Text>
         ))}
@@ -384,17 +400,19 @@ function blockLabel(block: LectureBlock): string {
   return "Проверка";
 }
 
-function createStyles(theme: AppTheme) {
+function createStyles(theme: AppTheme, width: number) {
+  const isPhone = width < 560;
+  const isCompact = width < 980;
+
   return StyleSheet.create({
     headerPills: {
       flexDirection: "row",
       flexWrap: "wrap"
     },
     heroCard: {
-      flexDirection: "row",
-      flexWrap: "wrap",
+      flexDirection: isCompact ? "column" : "row",
       borderRadius: theme.radius.xl,
-      padding: theme.spacing.xl,
+      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
@@ -404,26 +422,27 @@ function createStyles(theme: AppTheme) {
     heroLeft: {
       flex: 1,
       minWidth: 320,
-      paddingRight: theme.spacing.lg
+      paddingRight: isCompact ? 0 : theme.spacing.lg,
+      marginBottom: isCompact ? theme.spacing.md : 0
     },
     heroEyebrow: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.primary,
       marginBottom: theme.spacing.sm,
       textTransform: "uppercase",
-      letterSpacing: 0.4
+      letterSpacing: 0.3
     },
     heroTitle: {
-      fontSize: theme.typography.title,
-      lineHeight: theme.typography.title + 6,
-      fontWeight: "900",
+      fontSize: isPhone ? 24 : theme.typography.title,
+      lineHeight: isPhone ? 30 : theme.typography.title + 4,
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
     heroSubtitle: {
       fontSize: theme.typography.body,
-      lineHeight: 26,
+      lineHeight: 22,
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.lg,
       maxWidth: 760
@@ -446,7 +465,7 @@ function createStyles(theme: AppTheme) {
     },
     infoBadgeText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
     heroActions: {
@@ -458,9 +477,7 @@ function createStyles(theme: AppTheme) {
       marginBottom: theme.spacing.sm
     },
     heroStats: {
-      width: 260,
-      minWidth: 220,
-      justifyContent: "space-between"
+      width: isCompact ? "100%" : 260
     },
     miniStatCard: {
       borderRadius: theme.radius.lg,
@@ -472,7 +489,7 @@ function createStyles(theme: AppTheme) {
     },
     miniStatValue: {
       fontSize: 22,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -482,19 +499,14 @@ function createStyles(theme: AppTheme) {
       color: theme.colors.textSecondary
     },
     grid: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginHorizontal: -theme.spacing.xs
+      flexDirection: isCompact ? "column" : "row"
     },
     cardWide: {
-      flexBasis: 720,
-      flexGrow: 1,
-      marginHorizontal: theme.spacing.xs
+      flex: 1.2,
+      marginRight: isCompact ? 0 : theme.spacing.md
     },
     cardNarrow: {
-      flexBasis: 320,
-      flexGrow: 1,
-      marginHorizontal: theme.spacing.xs
+      flex: 0.8
     },
     infoGrid: {
       flexDirection: "row",
@@ -502,7 +514,7 @@ function createStyles(theme: AppTheme) {
       marginHorizontal: -theme.spacing.xs
     },
     infoTile: {
-      flexBasis: 220,
+      flexBasis: isPhone ? "100%" : 220,
       flexGrow: 1,
       marginHorizontal: theme.spacing.xs,
       marginBottom: theme.spacing.sm,
@@ -520,14 +532,14 @@ function createStyles(theme: AppTheme) {
     },
     infoTileValue: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
     sectionText: {
       fontSize: theme.typography.body,
       color: theme.colors.text,
       marginBottom: theme.spacing.sm,
-      lineHeight: 24
+      lineHeight: 22
     },
     listItem: {
       fontSize: theme.typography.body,
@@ -544,7 +556,7 @@ function createStyles(theme: AppTheme) {
     },
     videoTitle: {
       fontSize: theme.typography.sectionTitle,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.primary,
       marginBottom: theme.spacing.xs
     },
@@ -559,7 +571,7 @@ function createStyles(theme: AppTheme) {
       marginHorizontal: -theme.spacing.xs
     },
     blockSummaryCard: {
-      flexBasis: 300,
+      flexBasis: isPhone ? "100%" : 300,
       flexGrow: 1,
       marginHorizontal: theme.spacing.xs,
       marginBottom: theme.spacing.md,
@@ -579,7 +591,7 @@ function createStyles(theme: AppTheme) {
     },
     blockIndex: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.primary,
       marginBottom: theme.spacing.xs
     },
@@ -595,12 +607,12 @@ function createStyles(theme: AppTheme) {
     },
     blockTypeBadgeText: {
       fontSize: theme.typography.helper,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.textSecondary
     },
     blockTitle: {
       fontSize: theme.typography.sectionTitle,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },

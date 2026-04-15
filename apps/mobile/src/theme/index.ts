@@ -1,4 +1,4 @@
-﻿import { getColors, type ThemeMode } from "./colors";
+import { getColors, type ThemeMode } from "./colors";
 import { spacing } from "./spacing";
 import { typography } from "./typography";
 
@@ -15,32 +15,32 @@ export function createAppTheme(mode: ThemeMode) {
     radius: {
       xs: 8,
       sm: 12,
-      md: 16,
-      lg: 20,
-      xl: 26,
+      md: 14,
+      lg: 18,
+      xl: 24,
       pill: 999
     },
     shadow: {
       sm: {
         shadowColor: colors.shadow,
-        shadowOpacity: mode === "dark" ? 0.12 : 0.04,
-        shadowRadius: 6,
+        shadowOpacity: mode === "dark" ? 0.18 : 0.06,
+        shadowRadius: 8,
         shadowOffset: { width: 0, height: 2 },
-        elevation: 1
+        elevation: 2
       },
       md: {
         shadowColor: colors.shadow,
-        shadowOpacity: mode === "dark" ? 0.18 : 0.08,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 5 },
-        elevation: 3
+        shadowOpacity: mode === "dark" ? 0.22 : 0.1,
+        shadowRadius: 16,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 4
       },
       lg: {
         shadowColor: colors.shadow,
-        shadowOpacity: mode === "dark" ? 0.22 : 0.1,
-        shadowRadius: 18,
-        shadowOffset: { width: 0, height: 8 },
-        elevation: 5
+        shadowOpacity: mode === "dark" ? 0.26 : 0.12,
+        shadowRadius: 24,
+        shadowOffset: { width: 0, height: 10 },
+        elevation: 6
       }
     }
   };

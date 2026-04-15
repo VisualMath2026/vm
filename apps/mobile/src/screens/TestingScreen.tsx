@@ -113,9 +113,7 @@ export function TestingScreen({
       return null;
     }
 
-    return (
-      submissions.find((submission) => submission.studentLogin === userLogin) ?? null
-    );
+    return submissions.find((submission) => submission.studentLogin === userLogin) ?? null;
   }, [activeSession, submissions, userLogin]);
 
   function resetDraftInputs() {
@@ -193,7 +191,6 @@ export function TestingScreen({
 
     for (const question of activeSession.questions) {
       const value = studentAnswers[question.id];
-
       if (value) {
         preparedAnswers[question.id] = value;
       }
@@ -215,7 +212,7 @@ export function TestingScreen({
         <ScreenHeader
           theme={theme}
           title="Тестирование"
-          subtitle="Преподаватель запускает активный тест, а студенты видят его в своей вкладке."
+          subtitle="Быстрые classroom-проверки: собери тест, запусти его и сразу смотри ответы."
           rightSlot={
             <View style={styles.headerBadge}>
               <Text style={styles.headerBadgeText}>
@@ -268,30 +265,35 @@ export function TestingScreen({
                   {fixText("Студенты увидят тест во вкладке «Тестирование» после синхронизации.")}
                 </Text>
               ) : (
-                <View style={styles.questionList}>
-                  {submissions.map((submission) => (
-                    <View key={submission.id} style={styles.questionCard}>
-                      <Text style={styles.questionTitle}>{fixText(submission.studentName)}</Text>
-                      <Text style={styles.resultLine}>
-                        {fixText(
-                          `Результат: ${submission.correctCount}/${submission.totalQuestions} (${submission.percent}%)`
-                        )}
-                      </Text>
-                      <Text style={styles.explanationText}>
-                        {fixText(`Отправлено: ${formatDateTime(submission.submittedAt)}`)}
-                      </Text>
+                submissions.map((submission) => (
+                  <View key={submission.id} style={styles.questionCard}>
+                    <View style={styles.resultTop}>
+                      <View style={styles.resultTextWrap}>
+                        <Text style={styles.questionTitle}>{fixText(submission.studentName)}</Text>
+                        <Text style={styles.questionText}>
+                          {fixText(`Результат: ${submission.correctCount}/${submission.totalQuestions} (${submission.percent}%)`)}
+                        </Text>
+                        <Text style={styles.explanationText}>
+                          {fixText(`Отправлено: ${formatDateTime(submission.submittedAt)}`)}
+                        </Text>
+                      </View>
+
+                      <View style={styles.resultChip}>
+                        <Text style={styles.resultChipText}>{submission.percent}%</Text>
+                      </View>
                     </View>
-                  ))}
-                </View>
+                  </View>
+                ))
               )}
             </SectionCard>
           </>
         ) : (
-          <>
+          <View style={styles.dashboardRow}>
             <SectionCard
               theme={theme}
               title="Параметры теста"
               subtitle="Собери тест и запусти его для студентов."
+              style={styles.dashboardWide}
             >
               <AppInput
                 label="Название теста"
@@ -324,6 +326,7 @@ export function TestingScreen({
               theme={theme}
               title="Добавить вопрос"
               subtitle="Один вопрос и 4 варианта ответа."
+              style={styles.dashboardWide}
             >
               <AppInput
                 label="Текст вопроса"
@@ -363,7 +366,7 @@ export function TestingScreen({
                         styles.answerKeyChip,
                         {
                           borderColor: isActive ? theme.colors.primary : theme.colors.border,
-                          backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface
+                          backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surface
                         }
                       ]}
                     >
@@ -397,54 +400,54 @@ export function TestingScreen({
                 style={styles.actionTop}
               />
             </SectionCard>
-
-            <SectionCard
-              theme={theme}
-              title="Собранные вопросы"
-              subtitle={draftQuestions.length > 0 ? `Всего вопросов: ${draftQuestions.length}` : "Пока вопросов нет"}
-            >
-              {draftQuestions.length === 0 ? (
-                <Text style={styles.helperText}>
-                  {fixText("Добавь вопросы, потом запусти тест для студентов.")}
-                </Text>
-              ) : (
-                <View style={styles.questionList}>
-                  {draftQuestions.map((question, index) => (
-                    <View key={question.id} style={styles.questionCard}>
-                      <View style={styles.questionTop}>
-                        <View style={styles.questionTextWrap}>
-                          <Text style={styles.questionTitle}>{fixText(`Вопрос ${index + 1}`)}</Text>
-                          <Text style={styles.questionText}>{fixText(question.text)}</Text>
-                        </View>
-
-                        <AppButton
-                          label="Удалить"
-                          onPress={() => handleDeleteQuestion(question.id)}
-                          theme={theme}
-                          variant="ghost"
-                          fullWidth={false}
-                          style={styles.inlineButton}
-                        />
-                      </View>
-
-                      <View style={styles.optionList}>
-                        {question.options.map((option) => (
-                          <View key={option.key} style={styles.optionRow}>
-                            <Text style={styles.optionKey}>{option.key}</Text>
-                            <Text style={styles.optionText}>{fixText(option.text)}</Text>
-                            {option.key === question.correctAnswerKey ? (
-                              <Text style={styles.correctMark}>Правильный</Text>
-                            ) : null}
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </SectionCard>
-          </>
+          </View>
         )}
+
+        {!activeSession ? (
+          <SectionCard
+            theme={theme}
+            title="Собранные вопросы"
+            subtitle={draftQuestions.length > 0 ? `Всего вопросов: ${draftQuestions.length}` : "Пока вопросов нет"}
+          >
+            {draftQuestions.length === 0 ? (
+              <Text style={styles.helperText}>
+                {fixText("Добавь вопросы, потом запусти тест для студентов.")}
+              </Text>
+            ) : (
+              draftQuestions.map((question, index) => (
+                <View key={question.id} style={styles.questionCard}>
+                  <View style={styles.questionTop}>
+                    <View style={styles.questionTextWrap}>
+                      <Text style={styles.questionTitle}>{fixText(`Вопрос ${index + 1}`)}</Text>
+                      <Text style={styles.questionText}>{fixText(question.text)}</Text>
+                    </View>
+
+                    <AppButton
+                      label="Удалить"
+                      onPress={() => handleDeleteQuestion(question.id)}
+                      theme={theme}
+                      variant="ghost"
+                      fullWidth={false}
+                      style={styles.inlineButton}
+                    />
+                  </View>
+
+                  <View style={styles.optionList}>
+                    {question.options.map((option) => (
+                      <View key={option.key} style={styles.optionRow}>
+                        <Text style={styles.optionKey}>{option.key}</Text>
+                        <Text style={styles.optionText}>{fixText(option.text)}</Text>
+                        {option.key === question.correctAnswerKey ? (
+                          <Text style={styles.correctMark}>Правильный</Text>
+                        ) : null}
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ))
+            )}
+          </SectionCard>
+        ) : null}
       </Screen>
     );
   }
@@ -477,7 +480,7 @@ export function TestingScreen({
         <ScreenHeader
           theme={theme}
           title="Тестирование"
-          subtitle="Твой ответ уже отправлен."
+          subtitle="Ответ уже отправлен."
         />
 
         <SectionCard
@@ -514,45 +517,50 @@ export function TestingScreen({
         title={activeSession.title}
         subtitle={isExpired ? "Время вышло" : `Осталось времени: ${formatDuration(remainingSec)}`}
       >
-        <View style={styles.questionList}>
-          {activeSession.questions.map((question, index) => (
-            <View key={question.id} style={styles.questionCard}>
-              <Text style={styles.questionTitle}>{fixText(`Вопрос ${index + 1}`)}</Text>
-              <Text style={styles.questionText}>{fixText(question.text)}</Text>
+        <View style={styles.infoGrid}>
+          <InfoCard theme={theme} label="Вопросов" value={String(activeSession.questions.length)} />
+          <InfoCard theme={theme} label="Длительность" value={`${activeSession.durationMin} мин`} />
+          <InfoCard theme={theme} label="Статус" value={isExpired ? "Завершён" : "Активен"} />
+        </View>
 
-              <View style={styles.optionList}>
-                {question.options.map((option) => {
-                  const isSelected = studentAnswers[question.id] === option.key;
+        {activeSession.questions.map((question, index) => (
+          <View key={question.id} style={styles.questionCard}>
+            <Text style={styles.questionTitle}>{fixText(`Вопрос ${index + 1}`)}</Text>
+            <Text style={styles.questionText}>{fixText(question.text)}</Text>
 
-                  return (
-                    <Pressable
-                      key={option.key}
-                      disabled={isExpired}
-                      onPress={() => handleSelectStudentAnswer(question.id, option.key)}
+            <View style={styles.optionList}>
+              {question.options.map((option) => {
+                const isSelected = studentAnswers[question.id] === option.key;
+
+                return (
+                  <Pressable
+                    key={option.key}
+                    disabled={isExpired}
+                    onPress={() => handleSelectStudentAnswer(question.id, option.key)}
+                    style={[
+                      styles.answerKeyChip,
+                      styles.answerOptionWide,
+                      {
+                        borderColor: isSelected ? theme.colors.primary : theme.colors.border,
+                        backgroundColor: isSelected ? theme.colors.primarySoft : theme.colors.surface,
+                        opacity: isExpired ? 0.6 : 1
+                      }
+                    ]}
+                  >
+                    <Text
                       style={[
-                        styles.answerKeyChip,
-                        {
-                          borderColor: isSelected ? theme.colors.primary : theme.colors.border,
-                          backgroundColor: isSelected ? theme.colors.surfaceMuted : theme.colors.surface,
-                          opacity: isExpired ? 0.6 : 1
-                        }
+                        styles.answerKeyChipText,
+                        { color: isSelected ? theme.colors.primary : theme.colors.text }
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.answerKeyChipText,
-                          { color: isSelected ? theme.colors.primary : theme.colors.text }
-                        ]}
-                      >
-                        {fixText(`${option.key}. ${option.text}`)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+                      {fixText(`${option.key}. ${option.text}`)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
-          ))}
-        </View>
+          </View>
+        ))}
 
         <AppButton
           label={isExpired ? "Время вышло" : "Отправить ответы"}
@@ -573,7 +581,7 @@ type InfoCardProps = {
 };
 
 function InfoCard({ theme, label, value }: InfoCardProps) {
-  const styles = createStyles(theme, 900);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.infoCard}>
@@ -608,28 +616,35 @@ function formatDateTime(value: string): string {
 }
 
 function createStyles(theme: AppTheme, width: number) {
-  const isPhone = width < 520;
+  const isPhone = width < 560;
+  const isCompact = width < 980;
 
   return StyleSheet.create({
     headerBadge: {
-      minHeight: 40,
+      minHeight: 38,
       paddingHorizontal: theme.spacing.md,
       borderRadius: theme.radius.pill,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surfaceMuted,
-      borderWidth: 1,
-      borderColor: theme.colors.border
+      backgroundColor: theme.colors.primarySoft
     },
     headerBadgeText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
-      color: theme.colors.text
+      fontWeight: "700",
+      color: theme.colors.primary
+    },
+    dashboardRow: {
+      flexDirection: isCompact ? "column" : "row"
+    },
+    dashboardWide: {
+      flex: 1,
+      marginRight: isCompact ? 0 : theme.spacing.md
     },
     infoGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
-      marginHorizontal: -theme.spacing.xs
+      marginHorizontal: -theme.spacing.xs,
+      marginBottom: theme.spacing.sm
     },
     infoCard: {
       flexBasis: isPhone ? "100%" : 220,
@@ -644,7 +659,7 @@ function createStyles(theme: AppTheme, width: number) {
     },
     infoCardValue: {
       fontSize: theme.typography.body,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -683,12 +698,12 @@ function createStyles(theme: AppTheme, width: number) {
     },
     helperText: {
       fontSize: theme.typography.body,
-      lineHeight: 24,
+      lineHeight: 22,
       color: theme.colors.textSecondary
     },
     sectionLabel: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.sm
     },
@@ -698,7 +713,7 @@ function createStyles(theme: AppTheme, width: number) {
       marginBottom: theme.spacing.md
     },
     answerKeyChip: {
-      minHeight: 44,
+      minHeight: 42,
       borderRadius: theme.radius.md,
       borderWidth: 1,
       paddingHorizontal: theme.spacing.md,
@@ -707,12 +722,12 @@ function createStyles(theme: AppTheme, width: number) {
       marginRight: theme.spacing.sm,
       marginBottom: theme.spacing.sm
     },
+    answerOptionWide: {
+      marginRight: 0
+    },
     answerKeyChipText: {
       fontSize: theme.typography.body,
-      fontWeight: "800"
-    },
-    questionList: {
-      width: "100%"
+      fontWeight: "700"
     },
     questionCard: {
       borderRadius: theme.radius.lg,
@@ -720,8 +735,7 @@ function createStyles(theme: AppTheme, width: number) {
       backgroundColor: theme.colors.surfaceElevated,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.md,
-      ...theme.shadow.sm
+      marginBottom: theme.spacing.md
     },
     questionTop: {
       flexDirection: isPhone ? "column" : "row",
@@ -735,13 +749,13 @@ function createStyles(theme: AppTheme, width: number) {
     },
     questionTitle: {
       fontSize: theme.typography.sectionTitle,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
     questionText: {
       fontSize: theme.typography.body,
-      lineHeight: 24,
+      lineHeight: 22,
       color: theme.colors.text
     },
     optionList: {
@@ -761,7 +775,7 @@ function createStyles(theme: AppTheme, width: number) {
     optionKey: {
       width: 24,
       fontSize: theme.typography.body,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.primary,
       marginRight: theme.spacing.sm
     },
@@ -774,14 +788,31 @@ function createStyles(theme: AppTheme, width: number) {
     correctMark: {
       marginLeft: theme.spacing.sm,
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.success
     },
-    resultLine: {
-      marginTop: theme.spacing.sm,
-      fontSize: theme.typography.body,
-      lineHeight: 22,
-      color: theme.colors.textSecondary
+    resultTop: {
+      flexDirection: isPhone ? "column" : "row",
+      justifyContent: "space-between",
+      alignItems: isPhone ? "stretch" : "flex-start"
+    },
+    resultTextWrap: {
+      flex: 1,
+      paddingRight: isPhone ? 0 : theme.spacing.md,
+      marginBottom: isPhone ? theme.spacing.sm : 0
+    },
+    resultChip: {
+      minHeight: 34,
+      paddingHorizontal: theme.spacing.md,
+      borderRadius: theme.radius.pill,
+      backgroundColor: theme.colors.primarySoft,
+      alignItems: "center",
+      justifyContent: "center"
+    },
+    resultChipText: {
+      fontSize: theme.typography.caption,
+      fontWeight: "700",
+      color: theme.colors.primary
     },
     explanationText: {
       marginTop: theme.spacing.sm,

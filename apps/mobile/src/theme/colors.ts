@@ -1,24 +1,26 @@
-﻿export type ThemeMode = "light" | "dark";
+export type ThemeMode = "light" | "dark";
 
 const commonColors = {
-  primary: "#315EFB",
-  success: "#12B76A",
-  danger: "#D92D20",
-  warning: "#F79009"
+  primary: "#1A73E8",
+  primarySoft: "#E8F0FE",
+  success: "#188038",
+  danger: "#D93025",
+  warning: "#F9AB00",
+  info: "#1A73E8"
 };
 
 export function getColors(mode: ThemeMode) {
   if (mode === "dark") {
     return {
       ...commonColors,
-      background: "#0B1220",
-      surface: "#101828",
+      background: "#0F172A",
+      surface: "#111827",
       surfaceMuted: "#172033",
-      surfaceElevated: "#1C2740",
-      border: "#243041",
-      input: "#111B2E",
+      surfaceElevated: "#1E293B",
+      border: "#2A3A52",
+      input: "#0F1A2E",
       text: "#F8FAFC",
-      textSecondary: "#98A2B3",
+      textSecondary: "#94A3B8",
       shadow: "#000000",
       overlay: "rgba(2, 6, 23, 0.72)"
     };
@@ -26,15 +28,15 @@ export function getColors(mode: ThemeMode) {
 
   return {
     ...commonColors,
-    background: "#F5F7FB",
+    background: "#F6F8FC",
     surface: "#FFFFFF",
-    surfaceMuted: "#F2F5FB",
+    surfaceMuted: "#F1F3F4",
     surfaceElevated: "#FCFDFF",
-    border: "#E4E7EC",
-    input: "#FCFDFF",
-    text: "#101828",
-    textSecondary: "#667085",
-    shadow: "#101828",
-    overlay: "rgba(15, 23, 42, 0.18)"
+    border: "#DADCE0",
+    input: "#FFFFFF",
+    text: "#202124",
+    textSecondary: "#5F6368",
+    shadow: "#202124",
+    overlay: "rgba(32, 33, 36, 0.18)"
   };
 }

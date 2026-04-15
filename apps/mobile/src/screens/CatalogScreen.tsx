@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -73,31 +73,33 @@ export function CatalogScreen({
     <Screen theme={theme}>
       <ScreenHeader
         theme={theme}
-        title="Каталог лекций"
-        subtitle="Компактный учебный поток в стиле classroom: быстро открывай лекции и продолжай с последнего места."
+        title="Каталог курсов"
+        subtitle="Выбирай лекции, продолжай обучение и быстро находи нужные материалы."
         rightSlot={
-          <View style={styles.headerChip}>
-            <Text style={styles.headerChipText}>{lectures.length} лекций</Text>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeText}>{lectures.length} курсов</Text>
           </View>
         }
       />
 
       <View style={styles.heroCard}>
         <View style={styles.heroMain}>
-          <Text style={styles.heroEyebrow}>VisualMath Classroom</Text>
+          <Text style={styles.heroEyebrow}>Учебный кабинет</Text>
           <Text style={styles.heroTitle}>
-            {lastOpenedLecture ? lastOpenedLecture.title : "Выбери лекцию и начни обучение"}
+            {lastOpenedLecture
+              ? `Продолжить: ${lastOpenedLecture.title}`
+              : "Открой курс и начни работу"}
           </Text>
           <Text style={styles.heroText}>
             {lastOpenedLecture
-              ? "Последняя открытая лекция уже готова к продолжению. Ниже можно быстро найти нужную тему и перейти в неё."
-              : "Здесь собраны лекции, визуальные модули, задания и материалы курса."}
+              ? "Последняя лекция всегда под рукой. Продолжай с того места, где остановился."
+              : "Здесь собраны лекции, визуальные блоки, задания и материалы преподавателя."}
           </Text>
 
           <View style={styles.heroActions}>
             {lastOpenedLecture ? (
               <AppButton
-                label="Продолжить"
+                label="Продолжить курс"
                 onPress={() => onOpenLecture(lastOpenedLecture)}
                 theme={theme}
                 fullWidth={false}
@@ -106,7 +108,7 @@ export function CatalogScreen({
             ) : null}
 
             <AppButton
-              label="Обновить"
+              label="Обновить каталог"
               onPress={onRetry}
               theme={theme}
               variant="secondary"
@@ -116,18 +118,18 @@ export function CatalogScreen({
           </View>
         </View>
 
-        <View style={styles.heroStatsRow}>
-          <StatChip theme={theme} value={String(lectures.length)} label="Лекций" />
-          <StatChip theme={theme} value={String(totalBlocks)} label="Блоков" />
-          <StatChip theme={theme} value={isOffline ? "offline" : "online"} label="Режим" />
+        <View style={styles.statsRail}>
+          <StatCard theme={theme} value={String(lectures.length)} label="Курсов" />
+          <StatCard theme={theme} value={String(totalBlocks)} label="Блоков" />
+          <StatCard theme={theme} value={isOffline ? "offline" : "online"} label="Режим" />
         </View>
       </View>
 
       {isOffline ? (
         <View style={styles.bannerInfo}>
-          <Text style={styles.bannerTitle}>Оффлайн-режим</Text>
-          <Text style={styles.bannerText}>
-            Показаны сохранённые данные. Некоторые материалы могут быть не самыми свежими.
+          <Text style={styles.bannerInfoTitle}>Оффлайн-режим</Text>
+          <Text style={styles.bannerInfoText}>
+            Показана сохранённая версия каталога. Некоторые данные могут быть не самыми свежими.
           </Text>
         </View>
       ) : null}
@@ -136,7 +138,7 @@ export function CatalogScreen({
         <View style={styles.bannerError}>
           <View style={styles.bannerErrorTextWrap}>
             <Text style={styles.bannerErrorTitle}>Не удалось обновить каталог</Text>
-            <Text style={styles.bannerText}>Проверь соединение и попробуй ещё раз.</Text>
+            <Text style={styles.bannerErrorText}>Проверь соединение и попробуй ещё раз.</Text>
           </View>
 
           <AppButton
@@ -150,14 +152,14 @@ export function CatalogScreen({
       ) : null}
 
       <SectionCard
-        title="Поиск"
-        subtitle="Ищи по названию, предмету, описанию, автору и тегам."
+        title="Поиск по курсам"
+        subtitle="Ищи по названию, предмету, автору, описанию и тегам."
         theme={theme}
       >
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Например: Производная, матанализ, интеграл..."
+          placeholder="Например: производная, матанализ, пределы..."
           placeholderTextColor={theme.colors.textSecondary}
           style={styles.searchInput}
         />
@@ -173,21 +175,21 @@ export function CatalogScreen({
       </SectionCard>
 
       {isLoading && lectures.length === 0 ? (
-        <View>
+        <View style={styles.grid}>
           {[1, 2, 3].map((item) => (
             <View key={item} style={styles.skeletonCard}>
-              <View style={styles.skeletonBanner} />
               <View style={styles.skeletonTitle} />
               <View style={styles.skeletonMeta} />
-              <View style={styles.skeletonText} />
-              <View style={styles.skeletonTextShort} />
+              <View style={styles.skeletonMetaShort} />
+              <View style={styles.skeletonDescription} />
+              <View style={styles.skeletonDescriptionShort} />
             </View>
           ))}
         </View>
       ) : filteredLectures.length === 0 ? (
         <SectionCard
           title="Ничего не найдено"
-          subtitle="Попробуй сократить запрос или очистить поиск."
+          subtitle="Попробуй другой запрос или очисти поиск."
           theme={theme}
         >
           <AppButton
@@ -198,7 +200,7 @@ export function CatalogScreen({
           />
         </SectionCard>
       ) : (
-        <View style={styles.lectureList}>
+        <View style={styles.grid}>
           {filteredLectures.map((lecture) => {
             const isLastOpened = lastOpenedLecture?.id === lecture.id;
 
@@ -206,44 +208,49 @@ export function CatalogScreen({
               <Pressable
                 key={lecture.id}
                 onPress={() => onOpenLecture(lecture)}
-                style={[styles.lectureCard, isLastOpened ? styles.lectureCardActive : null]}
+                style={styles.cardPressable}
               >
-                <View style={styles.lectureCardBanner}>
-                  <View style={styles.bannerTextWrap}>
-                    <Text numberOfLines={2} style={styles.lectureTitle}>
-                      {lecture.title}
-                    </Text>
-                    <Text numberOfLines={1} style={styles.lectureMeta}>
-                      {lecture.subject} • {lecture.author}
-                    </Text>
+                <View style={[styles.lectureCard, isLastOpened ? styles.lectureCardHighlighted : null]}>
+                  <View style={styles.cardTopRow}>
+                    <View style={styles.badgesRow}>
+                      <InfoPill theme={theme} text={lecture.subject} tone="primary" />
+                      <InfoPill theme={theme} text={lecture.level} tone="neutral" />
+                      {isLastOpened ? <InfoPill theme={theme} text="Продолжить" tone="success" /> : null}
+                    </View>
                   </View>
 
-                  {isLastOpened ? (
-                    <View style={styles.activeBadge}>
-                      <Text style={styles.activeBadgeText}>Последняя</Text>
-                    </View>
-                  ) : null}
-                </View>
+                  <Text style={styles.lectureTitle}>{lecture.title}</Text>
 
-                <Text numberOfLines={3} style={styles.lectureDescription}>
-                  {lecture.description}
-                </Text>
+                  <Text style={styles.lectureMeta}>
+                    {lecture.author} • {lecture.semester}
+                  </Text>
 
-                <View style={styles.tagRow}>
-                  <MiniInfoPill theme={theme} text={lecture.level} />
-                  <MiniInfoPill theme={theme} text={lecture.semester} />
-                  <MiniInfoPill theme={theme} text={`${lecture.blocks.length} блока`} />
-                </View>
+                  <Text numberOfLines={3} style={styles.lectureDescription}>
+                    {lecture.description}
+                  </Text>
 
-                <View style={styles.cardFooter}>
-                  <Text style={styles.footerHint}>{lecture.estimatedDuration}</Text>
-                  <AppButton
-                    label="Открыть"
-                    onPress={() => onOpenLecture(lecture)}
-                    theme={theme}
-                    fullWidth={false}
-                    style={styles.openButton}
-                  />
+                  <View style={styles.tagsWrap}>
+                    {lecture.tags.slice(0, 3).map((tag) => (
+                      <View key={tag} style={styles.tagChip}>
+                        <Text style={styles.tagChipText}>{tag}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.footerInfoGrid}>
+                    <MiniInfoTile theme={theme} label="Блоков" value={String(lecture.blocks.length)} />
+                    <MiniInfoTile theme={theme} label="Длительность" value={lecture.estimatedDuration} />
+                  </View>
+
+                  <View style={styles.cardFooter}>
+                    <AppButton
+                      label="Открыть курс"
+                      onPress={() => onOpenLecture(lecture)}
+                      theme={theme}
+                      fullWidth={false}
+                      style={styles.openButton}
+                    />
+                  </View>
                 </View>
               </Pressable>
             );
@@ -254,82 +261,117 @@ export function CatalogScreen({
   );
 }
 
-type StatChipProps = {
+type StatCardProps = {
   theme: AppTheme;
   value: string;
   label: string;
 };
 
-function StatChip({ theme, value, label }: StatChipProps) {
-  const styles = createStyles(theme, 900);
+function StatCard({ theme, value, label }: StatCardProps) {
+  const styles = createStyles(theme, 1200);
 
   return (
-    <View style={styles.statChip}>
-      <Text style={styles.statChipValue}>{value}</Text>
-      <Text style={styles.statChipLabel}>{label}</Text>
+    <View style={styles.statCard}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
     </View>
   );
 }
 
-type MiniInfoPillProps = {
+type MiniInfoTileProps = {
   theme: AppTheme;
-  text: string;
+  label: string;
+  value: string;
 };
 
-function MiniInfoPill({ theme, text }: MiniInfoPillProps) {
-  const styles = createStyles(theme, 900);
+function MiniInfoTile({ theme, label, value }: MiniInfoTileProps) {
+  const styles = createStyles(theme, 1200);
 
   return (
-    <View style={styles.infoPill}>
-      <Text style={styles.infoPillText}>{text}</Text>
+    <View style={styles.footerTile}>
+      <Text style={styles.footerTileLabel}>{label}</Text>
+      <Text style={styles.footerTileValue}>{value}</Text>
+    </View>
+  );
+}
+
+type InfoPillProps = {
+  theme: AppTheme;
+  text: string;
+  tone: "primary" | "neutral" | "success";
+};
+
+function InfoPill({ theme, text, tone }: InfoPillProps) {
+  const styles = createStyles(theme, 1200);
+
+  return (
+    <View
+      style={[
+        styles.infoPill,
+        tone === "primary" ? styles.infoPillPrimary : null,
+        tone === "neutral" ? styles.infoPillNeutral : null,
+        tone === "success" ? styles.infoPillSuccess : null
+      ]}
+    >
+      <Text
+        style={[
+          styles.infoPillText,
+          tone === "primary" ? styles.infoPillTextPrimary : null,
+          tone === "success" ? styles.infoPillTextSuccess : null
+        ]}
+      >
+        {text}
+      </Text>
     </View>
   );
 }
 
 function createStyles(theme: AppTheme, width: number) {
-  const isPhone = width < 520;
-  const isCompact = width < 860;
+  const isPhone = width < 560;
+  const isCompact = width < 920;
 
   return StyleSheet.create({
-    headerChip: {
-      alignSelf: "flex-start",
-      minHeight: 34,
-      paddingHorizontal: theme.spacing.sm,
+    headerBadge: {
+      minHeight: 38,
+      paddingHorizontal: theme.spacing.md,
       borderRadius: theme.radius.pill,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.primarySoft,
       borderWidth: 1,
-      borderColor: theme.colors.border
+      borderColor: theme.colors.primarySoft
     },
-    headerChipText: {
+    headerBadgeText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
-      color: theme.colors.text
+      fontWeight: "700",
+      color: theme.colors.primary
     },
     heroCard: {
-      borderRadius: theme.radius.lg,
+      flexDirection: isCompact ? "column" : "row",
+      borderRadius: theme.radius.xl,
       padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.lg,
-      ...theme.shadow.md
+      marginBottom: theme.spacing.lg
     },
     heroMain: {
-      marginBottom: theme.spacing.md
+      flex: 1,
+      paddingRight: isCompact ? 0 : theme.spacing.lg,
+      marginBottom: isCompact ? theme.spacing.md : 0
     },
     heroEyebrow: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.primary,
+      letterSpacing: 0.3,
       marginBottom: theme.spacing.sm,
       textTransform: "uppercase"
     },
     heroTitle: {
       fontSize: isPhone ? 24 : theme.typography.title,
       lineHeight: isPhone ? 30 : theme.typography.title + 4,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
@@ -337,7 +379,8 @@ function createStyles(theme: AppTheme, width: number) {
       fontSize: theme.typography.body,
       lineHeight: 22,
       color: theme.colors.textSecondary,
-      marginBottom: theme.spacing.md
+      marginBottom: theme.spacing.lg,
+      maxWidth: 760
     },
     heroActions: {
       flexDirection: "row",
@@ -347,76 +390,77 @@ function createStyles(theme: AppTheme, width: number) {
       marginRight: theme.spacing.sm,
       marginBottom: theme.spacing.sm
     },
-    heroStatsRow: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      marginHorizontal: -theme.spacing.xs
+    statsRail: {
+      width: isCompact ? "100%" : 230
     },
-    statChip: {
-      minWidth: isCompact ? 96 : 112,
-      paddingVertical: theme.spacing.sm,
-      paddingHorizontal: theme.spacing.md,
-      borderRadius: theme.radius.md,
+    statCard: {
+      borderRadius: theme.radius.lg,
+      padding: theme.spacing.lg,
       backgroundColor: theme.colors.surfaceMuted,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginHorizontal: theme.spacing.xs,
+      marginBottom: theme.spacing.sm
+    },
+    statValue: {
+      fontSize: 26,
+      fontWeight: "700",
+      color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
-    statChipValue: {
-      fontSize: isPhone ? 18 : 20,
-      fontWeight: "900",
-      color: theme.colors.text,
-      marginBottom: 2
-    },
-    statChipLabel: {
+    statLabel: {
       fontSize: theme.typography.caption,
-      fontWeight: "700",
-      color: theme.colors.textSecondary
+      color: theme.colors.textSecondary,
+      fontWeight: "700"
     },
     bannerInfo: {
       borderRadius: theme.radius.lg,
-      padding: theme.spacing.md,
-      backgroundColor: theme.colors.surfaceMuted,
+      padding: theme.spacing.lg,
+      backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
       marginBottom: theme.spacing.md
     },
+    bannerInfoTitle: {
+      fontSize: theme.typography.body,
+      fontWeight: "700",
+      color: theme.colors.text,
+      marginBottom: theme.spacing.xs
+    },
+    bannerInfoText: {
+      fontSize: theme.typography.caption,
+      lineHeight: 20,
+      color: theme.colors.textSecondary
+    },
     bannerError: {
       borderRadius: theme.radius.lg,
-      padding: theme.spacing.md,
+      padding: theme.spacing.lg,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.danger,
       marginBottom: theme.spacing.md,
-      flexDirection: isCompact ? "column" : "row",
+      flexDirection: "row",
       justifyContent: "space-between",
-      alignItems: isCompact ? "stretch" : "center"
+      alignItems: "center",
+      flexWrap: "wrap"
     },
     bannerErrorTextWrap: {
       flex: 1,
-      paddingRight: isCompact ? 0 : theme.spacing.md,
-      marginBottom: isCompact ? theme.spacing.sm : 0
-    },
-    bannerTitle: {
-      fontSize: theme.typography.body,
-      fontWeight: "800",
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs
+      minWidth: 240,
+      paddingRight: theme.spacing.md
     },
     bannerErrorTitle: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.danger,
       marginBottom: theme.spacing.xs
     },
-    bannerText: {
+    bannerErrorText: {
       fontSize: theme.typography.caption,
-      lineHeight: 18,
+      lineHeight: 20,
       color: theme.colors.textSecondary
     },
     searchInput: {
-      minHeight: isPhone ? 48 : 52,
+      minHeight: 48,
       borderRadius: theme.radius.md,
       borderWidth: 1,
       borderColor: theme.colors.border,
@@ -438,8 +482,8 @@ function createStyles(theme: AppTheme, width: number) {
       color: theme.colors.textSecondary
     },
     clearChip: {
-      minHeight: 32,
-      paddingHorizontal: theme.spacing.sm,
+      minHeight: 34,
+      paddingHorizontal: theme.spacing.md,
       borderRadius: theme.radius.pill,
       backgroundColor: theme.colors.surfaceMuted,
       borderWidth: 1,
@@ -449,62 +493,85 @@ function createStyles(theme: AppTheme, width: number) {
     },
     clearChipText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
-    lectureList: {
-      width: "100%"
+    grid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginHorizontal: -theme.spacing.xs
+    },
+    cardPressable: {
+      flexBasis: width < 900 ? 320 : 360,
+      flexGrow: 1,
+      paddingHorizontal: theme.spacing.xs,
+      marginBottom: theme.spacing.md
     },
     lectureCard: {
-      borderRadius: theme.radius.lg,
-      padding: isPhone ? theme.spacing.md : theme.spacing.lg,
+      height: "100%",
+      minHeight: 320,
+      borderRadius: theme.radius.xl,
+      padding: theme.spacing.lg,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      marginBottom: theme.spacing.md,
-      ...theme.shadow.sm
+      borderColor: theme.colors.border
     },
-    lectureCardActive: {
+    lectureCardHighlighted: {
       borderColor: theme.colors.primary,
-      backgroundColor: theme.colors.surfaceElevated
+      backgroundColor: "#F8FBFF"
     },
-    lectureCardBanner: {
-      borderRadius: theme.radius.md,
-      padding: theme.spacing.md,
-      backgroundColor: theme.colors.surfaceMuted,
-      marginBottom: theme.spacing.md,
+    cardTopRow: {
+      marginBottom: theme.spacing.md
+    },
+    badgesRow: {
       flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "flex-start"
+      flexWrap: "wrap"
     },
-    bannerTextWrap: {
-      flex: 1,
-      paddingRight: theme.spacing.sm
-    },
-    lectureTitle: {
-      fontSize: theme.typography.sectionTitle,
-      lineHeight: 24,
-      fontWeight: "900",
-      color: theme.colors.text,
-      marginBottom: theme.spacing.xs
-    },
-    lectureMeta: {
-      fontSize: theme.typography.caption,
-      fontWeight: "700",
-      color: theme.colors.textSecondary
-    },
-    activeBadge: {
-      minHeight: 28,
+    infoPill: {
+      minHeight: 30,
       paddingHorizontal: theme.spacing.sm,
       borderRadius: theme.radius.pill,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.primary
+      borderWidth: 1,
+      marginRight: theme.spacing.xs,
+      marginBottom: theme.spacing.xs
     },
-    activeBadgeText: {
-      color: "#FFFFFF",
+    infoPillPrimary: {
+      backgroundColor: theme.colors.primarySoft,
+      borderColor: theme.colors.primarySoft
+    },
+    infoPillNeutral: {
+      backgroundColor: theme.colors.surfaceMuted,
+      borderColor: theme.colors.border
+    },
+    infoPillSuccess: {
+      backgroundColor: "#E6F4EA",
+      borderColor: "#E6F4EA"
+    },
+    infoPillText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800"
+      fontWeight: "700",
+      color: theme.colors.text
+    },
+    infoPillTextPrimary: {
+      color: theme.colors.primary
+    },
+    infoPillTextSuccess: {
+      color: theme.colors.success
+    },
+    lectureTitle: {
+      fontSize: theme.typography.sectionTitle,
+      lineHeight: 26,
+      fontWeight: "700",
+      color: theme.colors.text,
+      marginBottom: theme.spacing.sm
+    },
+    lectureMeta: {
+      fontSize: theme.typography.caption,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.md,
+      fontWeight: "700"
     },
     lectureDescription: {
       fontSize: theme.typography.body,
@@ -512,78 +579,101 @@ function createStyles(theme: AppTheme, width: number) {
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.md
     },
-    tagRow: {
+    tagsWrap: {
       flexDirection: "row",
       flexWrap: "wrap",
       marginBottom: theme.spacing.md
     },
-    infoPill: {
-      minHeight: 30,
+    tagChip: {
+      minHeight: 28,
       paddingHorizontal: theme.spacing.sm,
       borderRadius: theme.radius.pill,
-      justifyContent: "center",
       backgroundColor: theme.colors.surfaceMuted,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
+      justifyContent: "center",
       marginRight: theme.spacing.xs,
       marginBottom: theme.spacing.xs
     },
-    infoPillText: {
+    tagChipText: {
       fontSize: theme.typography.caption,
       fontWeight: "700",
       color: theme.colors.textSecondary
     },
-    cardFooter: {
-      flexDirection: isPhone ? "column" : "row",
-      justifyContent: "space-between",
-      alignItems: isPhone ? "stretch" : "center"
+    footerInfoGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      marginHorizontal: -theme.spacing.xs,
+      marginBottom: theme.spacing.md
     },
-    footerHint: {
+    footerTile: {
+      flexBasis: 140,
+      flexGrow: 1,
+      padding: theme.spacing.md,
+      marginHorizontal: theme.spacing.xs,
+      marginBottom: theme.spacing.sm,
+      borderRadius: theme.radius.md,
+      backgroundColor: theme.colors.surfaceMuted,
+      borderWidth: 1,
+      borderColor: theme.colors.border
+    },
+    footerTileLabel: {
       fontSize: theme.typography.caption,
       fontWeight: "700",
       color: theme.colors.textSecondary,
-      marginBottom: isPhone ? theme.spacing.sm : 0
+      marginBottom: theme.spacing.xs
+    },
+    footerTileValue: {
+      fontSize: theme.typography.body,
+      fontWeight: "700",
+      color: theme.colors.text
+    },
+    cardFooter: {
+      marginTop: "auto"
     },
     openButton: {
-      alignSelf: isPhone ? "stretch" : "flex-start"
+      alignSelf: "flex-start"
     },
     skeletonCard: {
-      borderRadius: theme.radius.lg,
+      flexBasis: width < 900 ? 320 : 360,
+      flexGrow: 1,
+      minHeight: 280,
+      borderRadius: theme.radius.xl,
       padding: theme.spacing.lg,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      marginBottom: theme.spacing.md
-    },
-    skeletonBanner: {
-      height: 72,
-      borderRadius: theme.radius.md,
-      backgroundColor: theme.colors.surfaceMuted,
+      marginHorizontal: theme.spacing.xs,
       marginBottom: theme.spacing.md
     },
     skeletonTitle: {
       width: "72%",
-      height: 22,
-      borderRadius: 8,
-      backgroundColor: theme.colors.surfaceMuted,
-      marginBottom: theme.spacing.sm
-    },
-    skeletonMeta: {
-      width: "48%",
-      height: 14,
+      height: 24,
       borderRadius: 8,
       backgroundColor: theme.colors.surfaceMuted,
       marginBottom: theme.spacing.md
     },
-    skeletonText: {
+    skeletonMeta: {
+      width: "56%",
+      height: 14,
+      borderRadius: 8,
+      backgroundColor: theme.colors.surfaceMuted,
+      marginBottom: theme.spacing.sm
+    },
+    skeletonMetaShort: {
+      width: "34%",
+      height: 14,
+      borderRadius: 8,
+      backgroundColor: theme.colors.surfaceMuted,
+      marginBottom: theme.spacing.lg
+    },
+    skeletonDescription: {
       width: "100%",
       height: 14,
       borderRadius: 8,
       backgroundColor: theme.colors.surfaceMuted,
       marginBottom: theme.spacing.sm
     },
-    skeletonTextShort: {
-      width: "72%",
+    skeletonDescriptionShort: {
+      width: "78%",
       height: 14,
       borderRadius: 8,
       backgroundColor: theme.colors.surfaceMuted

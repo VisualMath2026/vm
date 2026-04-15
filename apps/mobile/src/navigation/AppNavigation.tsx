@@ -7,6 +7,12 @@ import {
   View,
   useWindowDimensions
 } from "react-native";
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes
+} from "@react-native-google-signin/google-signin";
 import type { LectureDetails, QuizBlock, QuizQuestion, TextBlock } from "@vm/shared";
 import { createMockSession, evaluateSubmission, type SessionData, type TaskResult, type TaskSubmission } from "../mocks/session";
 import { clearTeacherParticipants, createTeacherManagedSession, moveTeacherSessionBlock, updateTeacherSessionStatus, type TeacherManagedSession } from "../mocks/teacher";
@@ -75,6 +81,7 @@ import {
 } from "../storage/teacherBranchesStorage";
 import {
   findTeacherAccount,
+  readStudentAccounts,
   registerStudentAccount,
   validateStudentCredentials
 } from "../storage/localUsersStorage";
@@ -111,6 +118,8 @@ type ScreenKey =
 type LoginRole = "student" | "teacher";
 type AuthMode = "login" | "register";
 type DemoDataMode = "online" | "offline" | "loading" | "error";
+
+const GOOGLE_WEB_CLIENT_ID = "PASTE_YOUR_WEB_CLIENT_ID_HERE.apps.googleusercontent.com";
 
 function nextMode(currentMode: DemoDataMode): DemoDataMode {
   if (currentMode === "online") {
@@ -825,6 +834,13 @@ export function AppNavigation() {
     );
   }, [testingSubmissions, visibleActiveTestingSession]);
   useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: GOOGLE_WEB_CLIENT_ID,
+      offlineAccess: false
+    });
+  }, []);
+
+  useEffect(() => {
     const savedDrafts = readDraftStorage();
 
     if (savedDrafts) {
@@ -1354,7 +1370,80 @@ export function AppNavigation() {
   }
 
   async function handleGoogleLogin(_payload: GoogleLoginPayload): Promise<string | null> {
-    return "Для реального входа через Google сначала добавь client IDs.";
+    if (!GOOGLE_WEB_CLIENT_ID || GOOGLE_WEB_CLIENT_ID.StartsWith("PASTE_YOUR_WEB_CLIENT_ID_HERE")) {
+      return "Сначала вставь реальный Google Web Client ID в AppNavigation.tsx.";
+    }
+
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const response = await GoogleSignin.signIn();
+
+      if (!isSuccessResponse(response)) {
+        return "Вход через Google отменён.";
+      }
+
+      const googleUser = response.data.user;
+      const safeEmail = String(googleUser.email ?? "").trim().toLowerCase();
+      const safeName = String(googleUser.name ?? "").trim();
+
+      if (!safeEmail) {
+        return "Google не вернул email пользователя.";
+      }
+
+      const existingAccounts = await readStudentAccounts();
+      const existingAccount =
+        existingAccounts.find((account) => account.login === safeEmail) ?? null;
+
+      if (!existingAccount) {
+        const registerResult = await registerStudentAccount({
+          login: safeEmail,
+          password: "google_oauth_account",
+          fullName: safeName || safeEmail,
+          group: mockUser.group
+        });
+
+        if (!registerResult.ok) {
+          return registerResult.error;
+        }
+      }
+
+      const nextUser: UserProfile = {
+        fullName: existingAccount?.fullName || safeName || safeEmail,
+        login: safeEmail,
+        role: "student",
+        group: existingAccount?.group || mockUser.group
+      };
+
+      await writeAuthMeta({
+        userLogin: nextUser.login,
+        role: "student",
+        fullName: nextUser.fullName,
+        group: nextUser.group
+      });
+
+      setUser(nextUser);
+      setIsAuthenticated(true);
+      setActiveScreen(selectedTeacherLogin ? "catalog" : "teacherBranchSelect");
+
+      try {
+        await refreshCatalogFromApi();
+      } catch {}
+
+      return null;
+    } catch (error: unknown) {
+      if (isErrorWithCode(error)) {
+        switch (error.code) {
+          case statusCodes.IN_PROGRESS:
+            return "Вход через Google уже выполняется.";
+          case statusCodes.PLAY_SERVICES_NOT_AVAILABLE:
+            return "На устройстве недоступны Google Play Services.";
+          default:
+            return "Не удалось выполнить вход через Google.";
+        }
+      }
+
+      return "Не удалось выполнить вход через Google.";
+    }
   }
 
   async function handleVkLogin(_payload: VkLoginPayload): Promise<string | null> {
@@ -1553,6 +1642,10 @@ export function AppNavigation() {
 
     try {
       await clearAuthSession();
+    } catch {}
+
+    try {
+      await GoogleSignin.signOut();
     } catch {}
 
     try {
@@ -2153,99 +2246,165 @@ export function AppNavigation() {
           justifyContent: "space-between",
           paddingHorizontal: topBarPaddingX,
           paddingTop: topBarPaddingTop,
-          paddingBottom: isPhoneLayout ? theme.spacing.xs : theme.spacing.sm,
+          paddingBottom: isPhoneLayout ? theme.spacing.sm : theme.spacing.md,
           backgroundColor: theme.colors.surface,
           borderBottomWidth: 1,
           borderBottomColor: theme.colors.border
         }}
       >
-        <Pressable
-          onPress={() => setIsMenuOpen((current) => !current)}
-          style={{
-            width: isPhoneLayout ? 36 : 40,
-            height: isPhoneLayout ? 36 : 40,
-            borderRadius: isPhoneLayout ? 10 : 12,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: theme.colors.surfaceMuted
-          }}
-        >
-          <Text
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          <Pressable
+            onPress={() => setIsMenuOpen((current) => !current)}
             style={{
-              fontSize: 24,
-              lineHeight: 24,
-              fontWeight: "800",
-              color: theme.colors.text
+              width: isPhoneLayout ? 38 : 42,
+              height: isPhoneLayout ? 38 : 42,
+              borderRadius: 21,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: theme.colors.primarySoft,
+              marginRight: theme.spacing.sm
             }}
           >
-            ⋯
-          </Text>
-        </Pressable>
+            <Text
+              style={{
+                fontSize: 22,
+                lineHeight: 22,
+                fontWeight: "700",
+                color: theme.colors.primary
+              }}
+            >
+              ≡
+            </Text>
+          </Pressable>
 
-        <Text
-          numberOfLines={1}
-          style={{
-            flexShrink: 1,
-            fontSize: headerTitleSize,
-            fontWeight: "800",
-            color: theme.colors.text
-          }}
-        >
-          VisualMath
-        </Text>
+          <View style={{ flexShrink: 1 }}>
+            <Text
+              numberOfLines={1}
+              style={{
+                flexShrink: 1,
+                fontSize: headerTitleSize,
+                fontWeight: "700",
+                color: theme.colors.text
+              }}
+            >
+              VisualMath
+            </Text>
+            {!isPhoneLayout ? (
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: theme.typography.caption,
+                  color: theme.colors.textSecondary,
+                  marginTop: 2
+                }}
+              >
+                Учебный кабинет
+              </Text>
+            ) : null}
+          </View>
+        </View>
 
-        <View
-          style={{
-            minHeight: isPhoneLayout ? 34 : 40,
-            maxWidth: isPhoneLayout ? 132 : 220,
-            paddingHorizontal: isPhoneLayout ? theme.spacing.sm : theme.spacing.md,
-            borderRadius: theme.radius.pill,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: theme.colors.surfaceMuted,
-            borderWidth: 1,
-            borderColor: theme.colors.border
-          }}
-        >
-          <Text
-            numberOfLines={1}
-            style={{
-              fontSize: theme.typography.caption,
-              fontWeight: "800",
-              color: theme.colors.text
-            }}
-          >
-            {roleBadgeLabel}
-          </Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {!isPhoneLayout ? (
+            <View
+              style={{
+                minHeight: 34,
+                maxWidth: 180,
+                paddingHorizontal: theme.spacing.md,
+                borderRadius: theme.radius.pill,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: theme.colors.surfaceMuted,
+                borderWidth: 1,
+                borderColor: theme.colors.border
+              }}
+            >
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontSize: theme.typography.caption,
+                  fontWeight: "700",
+                  color: theme.colors.text
+                }}
+              >
+                {roleBadgeLabel}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={{ width: isPhoneLayout ? 8 : 12 }} />
         </View>
       </View>
 
       {isMenuOpen ? (
+        <>
+          <Pressable
+            onPress={() => setIsMenuOpen(false)}
+            style={{
+              position: "absolute",
+              top: 0,
+              right: 0,
+              bottom: 0,
+              left: 0,
+              backgroundColor: "rgba(15, 23, 42, 0.12)",
+              zIndex: 40
+            }}
+          />
         <View
           style={{
             position: "absolute",
-            top: isPhoneLayout ? 60 : 72,
+            top: isPhoneLayout ? 62 : 76,
             left: menuPanelLeft,
             right: isPhoneLayout ? theme.spacing.sm : undefined,
             zIndex: 50,
-            minWidth: isPhoneLayout ? undefined : 220,
-            maxWidth: isPhoneLayout ? undefined : 280,
-            maxHeight: isPhoneLayout ? 560 : undefined,
-            borderRadius: isPhoneLayout ? 16 : 18,
+            width: isPhoneLayout ? undefined : 248,
+            maxWidth: isPhoneLayout ? undefined : 248,
+            maxHeight: isPhoneLayout ? 620 : undefined,
+            borderRadius: 22,
             borderWidth: 1,
             borderColor: theme.colors.border,
             backgroundColor: theme.colors.surface,
-            padding: isPhoneLayout ? theme.spacing.xs : theme.spacing.sm,
+            padding: theme.spacing.sm,
             shadowColor: "#000000",
-            shadowOpacity: 0.12,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 6 },
-            elevation: 8
+            shadowOpacity: 0.14,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 8 },
+            elevation: 10
           }}
         >
+          <View
+            style={{
+              paddingHorizontal: theme.spacing.sm,
+              paddingTop: theme.spacing.xs,
+              paddingBottom: theme.spacing.sm,
+              marginBottom: theme.spacing.sm,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.colors.border
+            }}
+          >
+            <Text
+              style={{
+                fontSize: theme.typography.sectionTitle,
+                fontWeight: "700",
+                color: theme.colors.text
+              }}
+            >
+              Навигация
+            </Text>
+
+            <Text
+              style={{
+                fontSize: theme.typography.caption,
+                color: theme.colors.textSecondary,
+                marginTop: 2
+              }}
+            >
+              {isTeacher ? "Инструменты преподавателя" : "Инструменты студента"}
+            </Text>
+          </View>
+
           {[
             { key: "catalog", label: "Каталог" },
-            { key: "teacherBranchSelect", label: "Преподаватель" },
             { key: "profile", label: "Профиль" },
             { key: "videoLessons", label: "Видеоуроки" },
             { key: "photoMaterials", label: "Фото" },
@@ -2255,44 +2414,51 @@ export function AppNavigation() {
             { key: "testing", label: "Тестирование" },
             { key: "latex", label: "LaTeX" },
             { key: "solver", label: "Уравнения" }
-          ].map((item) => (
-            <Pressable
-              key={item.key}
-              onPress={() =>
-                handleMenuNavigate(
-                  item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "testing" | "teacherBranchSelect" | "latex" | "profile"
-                )
-              }
-              style={{
-                paddingVertical: theme.spacing.sm,
-                paddingHorizontal: theme.spacing.md,
-                borderRadius: 12,
-                backgroundColor:
-                  (item.key === "catalog" &&
-                    (activeScreen === "catalog" ||
-                      activeScreen === "details" ||
-                      activeScreen === "session" ||
-                      activeScreen === "task" ||
-                      activeScreen === "result" ||
-                      activeScreen === "teacherHome" ||
-                      activeScreen === "teacherSession")) ||
-                  activeScreen === item.key
-                    ? theme.colors.surfaceMuted
-                    : theme.colors.surface
-              }}
-            >
-              <Text
+          ].map((item) => {
+            const isCatalogActive =
+              item.key === "catalog" &&
+              (activeScreen === "catalog" ||
+                activeScreen === "details" ||
+                activeScreen === "session" ||
+                activeScreen === "task" ||
+                activeScreen === "result" ||
+                activeScreen === "teacherHome" ||
+                activeScreen === "teacherSession");
+
+            const isActive = isCatalogActive || activeScreen === item.key;
+
+            return (
+              <Pressable
+                key={item.key}
+                onPress={() =>
+                  handleMenuNavigate(
+                    item.key as "catalog" | "solver" | "videoLessons" | "photoMaterials" | "meetings" | "homework" | "grades" | "testing" | "teacherBranchSelect" | "latex" | "profile"
+                  )
+                }
                 style={{
-                  fontSize: theme.typography.body,
-                  fontWeight: "700",
-                  color: theme.colors.text
+                  paddingVertical: theme.spacing.sm,
+                  paddingHorizontal: theme.spacing.md,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: isActive ? theme.colors.primarySoft : "transparent",
+                  backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surface,
+                  marginBottom: theme.spacing.xs
                 }}
               >
-                {item.label}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={{
+                    fontSize: theme.typography.body,
+                    fontWeight: isActive ? "800" : "700",
+                    color: isActive ? theme.colors.primary : theme.colors.text
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
+        </>
       ) : null}
 
       <View style={styles.content}>

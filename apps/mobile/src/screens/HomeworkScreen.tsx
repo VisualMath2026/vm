@@ -1,10 +1,11 @@
-﻿import React, { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Platform,
   Pressable,
   StyleSheet,
   Text,
-  View
+  View,
+  useWindowDimensions
 } from "react-native";
 
 import { AppButton } from "../components/ui/AppButton";
@@ -50,6 +51,8 @@ type HomeworkScreenProps = {
 
 const FORMAT_OPTIONS = ["pdf", "doc", "docx", "png", "jpg", "jpeg"] as const;
 
+type StatusTone = "success" | "warning" | "info" | "neutral";
+
 export function HomeworkScreen({
   theme,
   isTeacher,
@@ -63,7 +66,8 @@ export function HomeworkScreen({
   onDeleteSubmission,
   onGradeSubmission
 }: HomeworkScreenProps) {
-  const styles = createStyles(theme);
+  const { width } = useWindowDimensions();
+  const styles = createStyles(theme, width);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -107,17 +111,17 @@ export function HomeworkScreen({
     const nextMaxScore = Number(maxScore);
 
     if (!nextTitle || !nextDescription || !nextDueDate || !nextDueTime) {
-      setError("Заполните название, описание, дату и время.");
+      setError("Заполни название, описание, дату и время.");
       return;
     }
 
     if (!Number.isFinite(nextMaxScore) || nextMaxScore <= 0) {
-      setError("Укажите корректный максимальный балл.");
+      setError("Укажи корректный максимальный балл.");
       return;
     }
 
     if (allowedFormats.length === 0) {
-      setError("Выберите хотя бы один формат файла.");
+      setError("Выбери хотя бы один формат файла.");
       return;
     }
 
@@ -250,7 +254,7 @@ export function HomeworkScreen({
           </Text>
           <Text style={styles.heroSubtitle}>
             {isTeacher
-              ? "Создавайте задания, ставьте дедлайны и проверяйте файлы студентов в одном месте."
+              ? "Создавай задания, ставь дедлайны и проверяй файлы студентов в одном месте."
               : "Здесь видны активные задания, допустимые форматы и текущий статус каждой сдачи."}
           </Text>
           {error ? <Text style={styles.errorText}>{fixText(error)}</Text> : null}
@@ -275,7 +279,7 @@ export function HomeworkScreen({
         <SectionCard
           theme={theme}
           title="Новое домашнее задание"
-          subtitle="Заполните карточку задания и выберите допустимые форматы файлов."
+          subtitle="Заполни карточку задания и выбери допустимые форматы файлов."
         >
           <AppInput
             label="Название задания"
@@ -346,7 +350,7 @@ export function HomeworkScreen({
                     styles.formatChip,
                     {
                       borderColor: isActive ? theme.colors.primary : theme.colors.border,
-                      backgroundColor: isActive ? theme.colors.surfaceMuted : theme.colors.surface
+                      backgroundColor: isActive ? theme.colors.primarySoft : theme.colors.surface
                     }
                   ]}
                 >
@@ -594,7 +598,7 @@ type MiniStatCardProps = {
 };
 
 function MiniStatCard({ theme, value, label }: MiniStatCardProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.miniStatCard}>
@@ -611,7 +615,7 @@ type InfoTileProps = {
 };
 
 function InfoTile({ theme, label, value }: InfoTileProps) {
-  const styles = createStyles(theme);
+  const styles = createStyles(theme, 1200);
 
   return (
     <View style={styles.infoTile}>
@@ -689,7 +693,7 @@ function homeworkStatusLabel(
 function homeworkStatusTone(
   homework: HomeworkItem,
   submission: HomeworkSubmissionItem | null
-) {
+): StatusTone {
   if (submission?.score !== null) {
     return "success";
   }
@@ -705,28 +709,30 @@ function homeworkStatusTone(
   return "neutral";
 }
 
-function createStyles(theme: AppTheme) {
+function createStyles(theme: AppTheme, width: number) {
+  const isPhone = width < 560;
+  const isCompact = width < 980;
+
   return StyleSheet.create({
     headerChip: {
-      minHeight: 42,
+      minHeight: 38,
       paddingHorizontal: theme.spacing.md,
       borderRadius: theme.radius.pill,
       alignItems: "center",
       justifyContent: "center",
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.primarySoft,
       borderWidth: 1,
-      borderColor: theme.colors.border
+      borderColor: theme.colors.primarySoft
     },
     headerChipText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
-      color: theme.colors.text
+      fontWeight: "700",
+      color: theme.colors.primary
     },
     heroCard: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      borderRadius: theme.radius.lg,
-      padding: theme.spacing.xl,
+      flexDirection: isCompact ? "column" : "row",
+      borderRadius: theme.radius.xl,
+      padding: isPhone ? theme.spacing.lg : theme.spacing.xl,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
@@ -735,34 +741,33 @@ function createStyles(theme: AppTheme) {
     heroLeft: {
       flex: 1,
       minWidth: 320,
-      paddingRight: theme.spacing.lg
+      paddingRight: isCompact ? 0 : theme.spacing.lg,
+      marginBottom: isCompact ? theme.spacing.md : 0
     },
     heroEyebrow: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.primary,
       marginBottom: theme.spacing.sm,
       textTransform: "uppercase",
-      letterSpacing: 0.4
+      letterSpacing: 0.3
     },
     heroTitle: {
-      fontSize: theme.typography.title,
-      lineHeight: theme.typography.title + 6,
-      fontWeight: "900",
+      fontSize: isPhone ? 24 : theme.typography.title,
+      lineHeight: isPhone ? 30 : theme.typography.title + 4,
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.sm
     },
     heroSubtitle: {
       fontSize: theme.typography.body,
-      lineHeight: 26,
+      lineHeight: 22,
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.lg,
       maxWidth: 760
     },
     heroStats: {
-      width: 260,
-      minWidth: 220,
-      justifyContent: "space-between"
+      width: isCompact ? "100%" : 260
     },
     miniStatCard: {
       borderRadius: theme.radius.lg,
@@ -774,7 +779,7 @@ function createStyles(theme: AppTheme) {
     },
     miniStatValue: {
       fontSize: 24,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -785,7 +790,7 @@ function createStyles(theme: AppTheme) {
     },
     sectionLabel: {
       fontSize: theme.typography.caption,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.sm
     },
@@ -806,7 +811,7 @@ function createStyles(theme: AppTheme) {
     },
     formatChipText: {
       fontSize: theme.typography.caption,
-      fontWeight: "800"
+      fontWeight: "700"
     },
     inputGrid: {
       flexDirection: "row",
@@ -840,27 +845,27 @@ function createStyles(theme: AppTheme) {
       width: "100%"
     },
     homeworkCard: {
-      borderRadius: theme.radius.lg,
+      borderRadius: theme.radius.xl,
       padding: theme.spacing.lg,
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.surfaceElevated,
       borderWidth: 1,
       borderColor: theme.colors.border,
       marginBottom: theme.spacing.md
     },
     homeworkTop: {
-      flexDirection: "row",
+      flexDirection: isPhone ? "column" : "row",
       justifyContent: "space-between",
-      alignItems: "flex-start",
-      flexWrap: "wrap",
+      alignItems: isPhone ? "stretch" : "flex-start",
       marginBottom: theme.spacing.md
     },
     homeworkTextWrap: {
       flex: 1,
-      paddingRight: theme.spacing.md
+      paddingRight: isPhone ? 0 : theme.spacing.md,
+      marginBottom: isPhone ? theme.spacing.sm : 0
     },
     homeworkTitle: {
       fontSize: theme.typography.sectionTitle,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
@@ -871,7 +876,7 @@ function createStyles(theme: AppTheme) {
     },
     descriptionText: {
       fontSize: theme.typography.body,
-      lineHeight: 24,
+      lineHeight: 22,
       color: theme.colors.textSecondary,
       marginBottom: theme.spacing.sm
     },
@@ -882,13 +887,13 @@ function createStyles(theme: AppTheme) {
       marginBottom: theme.spacing.sm
     },
     infoTile: {
-      flexBasis: 220,
+      flexBasis: isPhone ? "100%" : 220,
       flexGrow: 1,
       marginHorizontal: theme.spacing.xs,
       marginBottom: theme.spacing.sm,
       padding: theme.spacing.md,
       borderRadius: theme.radius.md,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surfaceMuted,
       borderWidth: 1,
       borderColor: theme.colors.border
     },
@@ -900,7 +905,7 @@ function createStyles(theme: AppTheme) {
     },
     infoTileValue: {
       fontSize: theme.typography.body,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text
     },
     actionRow: {
@@ -916,7 +921,7 @@ function createStyles(theme: AppTheme) {
       marginTop: theme.spacing.md,
       borderRadius: theme.radius.md,
       padding: theme.spacing.md,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surfaceMuted,
       borderWidth: 1,
       borderColor: theme.colors.border
     },
@@ -928,32 +933,32 @@ function createStyles(theme: AppTheme) {
     },
     teacherSubmissionsTitle: {
       fontSize: theme.typography.sectionTitle,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.md
     },
     submissionCard: {
-      borderRadius: theme.radius.md,
+      borderRadius: theme.radius.lg,
       padding: theme.spacing.md,
-      backgroundColor: theme.colors.surface,
+      backgroundColor: theme.colors.surfaceMuted,
       borderWidth: 1,
       borderColor: theme.colors.border,
       marginBottom: theme.spacing.md
     },
     submissionTop: {
-      flexDirection: "row",
+      flexDirection: isPhone ? "column" : "row",
       justifyContent: "space-between",
-      alignItems: "flex-start",
-      flexWrap: "wrap",
+      alignItems: isPhone ? "stretch" : "flex-start",
       marginBottom: theme.spacing.md
     },
     submissionTextWrap: {
       flex: 1,
-      paddingRight: theme.spacing.md
+      paddingRight: isPhone ? 0 : theme.spacing.md,
+      marginBottom: isPhone ? theme.spacing.sm : 0
     },
     submissionTitle: {
       fontSize: theme.typography.body,
-      fontWeight: "900",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },

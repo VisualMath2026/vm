@@ -1,5 +1,5 @@
-﻿import React from "react";
-import { StyleSheet, Text, View, type ViewStyle, useWindowDimensions } from "react-native";
+import React from "react";
+import { StyleSheet, Text, View, type ViewStyle } from "react-native";
 
 import { fixText } from "../../utils/fixText";
 import type { AppTheme } from "../../theme";
@@ -19,8 +19,7 @@ export function SectionCard({
   children,
   style
 }: SectionCardProps) {
-  const { width } = useWindowDimensions();
-  const styles = createStyles(theme, width);
+  const styles = createStyles(theme);
 
   return (
     <View style={[styles.card, style]}>
@@ -36,25 +35,22 @@ export function SectionCard({
   );
 }
 
-function createStyles(theme: AppTheme, width: number) {
-  const isPhone = width < 480;
-
+function createStyles(theme: AppTheme) {
   return StyleSheet.create({
     card: {
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      borderRadius: isPhone ? theme.radius.md : theme.radius.lg,
-      padding: isPhone ? theme.spacing.md : theme.spacing.lg,
-      marginBottom: theme.spacing.md,
-      ...theme.shadow.md
+      borderRadius: theme.radius.lg,
+      padding: theme.spacing.lg,
+      marginBottom: theme.spacing.md
     },
     header: {
       marginBottom: theme.spacing.md
     },
     title: {
       fontSize: theme.typography.sectionTitle,
-      fontWeight: "800",
+      fontWeight: "700",
       color: theme.colors.text,
       marginBottom: theme.spacing.xs
     },
