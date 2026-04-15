@@ -10,10 +10,27 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.visualmath.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.visualmath.mobile"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "@react-native-google-signin/google-signin"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "c4119ad1-327b-4e83-bfa0-e2baf271cb8f"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
     }
   }
 }

@@ -1,0 +1,96 @@
+﻿import React, { useState } from "react";
+import {
+  StyleSheet,
+  Text,
+  TextInput,
+  type TextInputProps,
+  View
+} from "react-native";
+
+import { fixText } from "../../utils/fixText";
+import type { AppTheme } from "../../theme";
+
+type AppInputProps = TextInputProps & {
+  label: string;
+  theme: AppTheme;
+  error?: string;
+};
+
+export function AppInput({
+  label,
+  theme,
+  error,
+  style,
+  onFocus,
+  onBlur,
+  multiline,
+  ...props
+}: AppInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+  const styles = createStyles(theme, Boolean(error), isFocused, Boolean(multiline));
+
+  return (
+    <View style={styles.wrapper}>
+      <Text style={styles.label}>{fixText(label)}</Text>
+      <TextInput
+        placeholderTextColor={theme.colors.textSecondary}
+        style={[styles.input, style]}
+        multiline={multiline}
+        onFocus={(event) => {
+          setIsFocused(true);
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setIsFocused(false);
+          onBlur?.(event);
+        }}
+        {...props}
+      />
+      {error ? <Text style={styles.error}>{fixText(error)}</Text> : null}
+    </View>
+  );
+}
+
+function createStyles(
+  theme: AppTheme,
+  hasError: boolean,
+  isFocused: boolean,
+  isMultiline: boolean
+) {
+  return StyleSheet.create({
+    wrapper: {
+      width: "100%",
+      marginBottom: theme.spacing.md
+    },
+    label: {
+      fontSize: theme.typography.caption,
+      color: theme.colors.textSecondary,
+      marginBottom: theme.spacing.sm,
+      fontWeight: "700",
+      letterSpacing: 0.2
+    },
+    input: {
+      minHeight: isMultiline ? 120 : 56,
+      borderRadius: theme.radius.md,
+      borderWidth: 1,
+      borderColor: hasError
+        ? theme.colors.danger
+        : isFocused
+          ? theme.colors.primary
+          : theme.colors.border,
+      backgroundColor: theme.colors.input,
+      color: theme.colors.text,
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: isMultiline ? theme.spacing.md : theme.spacing.sm,
+      fontSize: theme.typography.body,
+      textAlignVertical: isMultiline ? "top" : "center",
+      ...(isFocused ? theme.shadow.sm : {})
+    },
+    error: {
+      marginTop: theme.spacing.xs,
+      color: theme.colors.danger,
+      fontSize: theme.typography.caption,
+      fontWeight: "600"
+    }
+  });
+}

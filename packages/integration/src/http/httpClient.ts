@@ -1,4 +1,4 @@
-import { err, normalizeError, type AppError } from "@vm/shared";
+﻿import { err, normalizeError, type AppError } from "@vm/shared";
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -13,6 +13,23 @@ export interface TokenProvider {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: string }).name === "AbortError"
+  );
+}
+
+function normalizeTransportError(error: unknown): AppError {
+  if (error instanceof TypeError) {
+    return err("NETWORK", error.message, undefined, true);
+  }
+
+  return normalizeError(error);
 }
 
 export class HttpClient {
@@ -43,10 +60,14 @@ export class HttpClient {
     const url = this.opts.baseUrl.replace(/\/$/, "") + path;
     const timeoutMs = this.opts.timeoutMs ?? 15000;
     const maxRetries = this.opts.maxRetries ?? 2;
+
+    const allowAuthRecovery = !path.startsWith("/auth/");
     let last: AppError | null = null;
+    let didAuthRecovery = false;
 
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
       const token = await this.tokenProvider.getAccessToken();
+
       const headers = new Headers(init.headers ?? {});
       headers.set("Accept", "application/json");
 
@@ -75,19 +96,19 @@ export class HttpClient {
           const isAuth = response.status === 401 || response.status === 403;
           const retryable = response.status >= 500;
 
-          const error = err(
+          if (isAuth && allowAuthRecovery && !didAuthRecovery && this.tokenProvider.onAuthFail) {
+            didAuthRecovery = true;
+            await this.tokenProvider.onAuthFail();
+            continue;
+          }
+
+          throw err(
             isAuth ? "AUTH" : "HTTP",
             `HTTP ${response.status} ${response.statusText}`,
             raw,
             retryable,
             response.status
           );
-
-          if (isAuth) {
-            await this.tokenProvider.onAuthFail?.();
-          }
-
-          throw error;
         }
 
         if (response.status === 204) {
@@ -109,18 +130,14 @@ export class HttpClient {
         return (await response.json()) as T;
       } catch (error) {
         clearTimeout(timer);
-        const normalized = normalizeError(error);
+
+        const normalized = normalizeTransportError(error);
         last = normalized;
 
         const retryable =
+          isAbortError(error) ||
           normalized.code === "NETWORK" ||
-          (normalized.code === "HTTP" && normalized.retryable === true) ||
-          (
-            typeof error === "object" &&
-            error &&
-            "name" in error &&
-            (error as { name?: string }).name === "AbortError"
-          );
+          (normalized.code === "HTTP" && normalized.retryable === true);
 
         if (!retryable || attempt === maxRetries) {
           break;

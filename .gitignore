@@ -9,3 +9,7 @@ coverage
 Thumbs.db
 .vscode
 .idea
+apps/mobile/.env.local
+*.bak_*
+google-services.json
+GoogleService-Info.plist

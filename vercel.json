@@ -1,0 +1,12 @@
+{
+  "framework": null,
+  "buildCommand": "pnpm --filter @vm/mobile build:web",
+  "outputDirectory": "apps/mobile/dist",
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/:path*",
+      "destination": "/"
+    }
+  ]
+}
