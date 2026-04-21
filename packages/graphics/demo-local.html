@@ -49,6 +49,7 @@
       <label for="expr">f(x) =</label>
       <input id="expr" value="sin(x)" />
       <button id="plot">Plot</button>
+      <button id="fit">Auto Fit</button>
     </div>
 
     <canvas id="canvas" width="1200" height="720"></canvas>
@@ -60,12 +61,14 @@
         Axis2D,
         Label2D,
         Interaction2D,
-        plotFunctionExpression
+        plotFunctionExpression,
+        compileFunctionExpression
       } from "./dist/index.js";
 
       const canvas = document.getElementById("canvas");
       const exprInput = document.getElementById("expr");
       const plotButton = document.getElementById("plot");
+      const fitButton = document.getElementById("fit");
       const context = canvas.getContext("2d");
 
       const scene = new Scene2D({
@@ -74,13 +77,46 @@
       });
 
       scene
-        .add(new Grid2D({ id: "grid", step: 1, extent: 20 }))
-        .add(new Axis2D({ id: "axis", extent: 20, strokeStyle: "#111827", lineWidth: 2 }));
+        .add(new Grid2D({ id: "grid", step: 1, extent: 50 }))
+        .add(new Axis2D({ id: "axis", extent: 50, strokeStyle: "#111827", lineWidth: 2 }));
 
       let graphId = 0;
 
       function render() {
         scene.render(context);
+      }
+
+      function estimateBounds(fn, xMin, xMax, samples = 1000) {
+        let minY = Infinity;
+        let maxY = -Infinity;
+        const step = (xMax - xMin) / samples;
+
+        for (let i = 0; i <= samples; i += 1) {
+          const x = xMin + i * step;
+          const y = fn(x);
+          if (Number.isFinite(y)) {
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+
+        if (!Number.isFinite(minY) || !Number.isFinite(maxY)) {
+          minY = -10;
+          maxY = 10;
+        }
+
+        if (Math.abs(maxY - minY) < 1e-6) {
+          minY -= 1;
+          maxY += 1;
+        }
+
+        return { minX: xMin, maxX: xMax, minY, maxY };
+      }
+
+      function autoFit(expression) {
+        const fn = compileFunctionExpression(expression);
+        const bounds = estimateBounds(fn, -10, 10, 1200);
+        scene.camera.fitToBounds(bounds, canvas.width, canvas.height, 60);
       }
 
       function plotExpression(expression) {
@@ -113,12 +149,23 @@
             })
           );
 
+        autoFit(expression);
         render();
       }
 
       plotButton.addEventListener("click", () => {
         try {
           plotExpression(exprInput.value.trim());
+        } catch (error) {
+          alert("Invalid expression");
+          console.error(error);
+        }
+      });
+
+      fitButton.addEventListener("click", () => {
+        try {
+          autoFit(exprInput.value.trim());
+          render();
         } catch (error) {
           alert("Invalid expression");
           console.error(error);

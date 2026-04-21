@@ -54,6 +54,26 @@ export class Camera2D {
     this.y += before.y - after.y;
   }
 
+  fitToBounds(
+    bounds: { minX: number; maxX: number; minY: number; maxY: number },
+    width: number,
+    height: number,
+    padding = 40
+  ): void {
+    const spanX = Math.max(bounds.maxX - bounds.minX, 1e-6);
+    const spanY = Math.max(bounds.maxY - bounds.minY, 1e-6);
+
+    const usableWidth = Math.max(width - padding * 2, 1);
+    const usableHeight = Math.max(height - padding * 2, 1);
+
+    const zoomX = usableWidth / spanX;
+    const zoomY = usableHeight / spanY;
+
+    this.zoom = Math.min(this.maxZoom, Math.max(this.minZoom, Math.min(zoomX, zoomY)));
+    this.x = (bounds.minX + bounds.maxX) / 2;
+    this.y = (bounds.minY + bounds.maxY) / 2;
+  }
+
   toJSON(): Camera2DOptions {
     return {
       x: this.x,
