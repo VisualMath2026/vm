@@ -44,6 +44,10 @@ export interface Grid2DOptions extends BasePrimitiveOptions {
 
 export interface Axis2DOptions extends BasePrimitiveOptions {
   extent?: number;
+  tickStep?: number;
+  tickSize?: number;
+  showLabels?: boolean;
+  labelFont?: string;
 }
 
 export interface FunctionGraph2DOptions extends BasePrimitiveOptions {
@@ -281,24 +285,37 @@ export class Grid2D extends BasePrimitive {
 
 export class Axis2D extends BasePrimitive {
   extent: number;
+  tickStep: number;
+  tickSize: number;
+  showLabels: boolean;
+  labelFont: string;
 
   constructor(options: Axis2DOptions) {
     super("axis2d", options);
     this.extent = options.extent ?? 20;
+    this.tickStep = options.tickStep ?? 1;
+    this.tickSize = options.tickSize ?? 6;
+    this.showLabels = options.showLabels ?? true;
+    this.labelFont = options.labelFont ?? "12px sans-serif";
     this.strokeStyle = options.strokeStyle ?? "#111827";
   }
 
   render(context: CanvasRenderingContext2D, camera: Camera2D): void {
     if (!this.visible) return;
 
-    const xAxisA = camera.worldToScreen({ x: -this.extent, y: 0 }, context.canvas.width, context.canvas.height);
-    const xAxisB = camera.worldToScreen({ x: this.extent, y: 0 }, context.canvas.width, context.canvas.height);
-    const yAxisA = camera.worldToScreen({ x: 0, y: -this.extent }, context.canvas.width, context.canvas.height);
-    const yAxisB = camera.worldToScreen({ x: 0, y: this.extent }, context.canvas.width, context.canvas.height);
+    const width = context.canvas.width;
+    const height = context.canvas.height;
+
+    const xAxisA = camera.worldToScreen({ x: -this.extent, y: 0 }, width, height);
+    const xAxisB = camera.worldToScreen({ x: this.extent, y: 0 }, width, height);
+    const yAxisA = camera.worldToScreen({ x: 0, y: -this.extent }, width, height);
+    const yAxisB = camera.worldToScreen({ x: 0, y: this.extent }, width, height);
 
     context.save();
     context.strokeStyle = this.strokeStyle;
+    context.fillStyle = this.strokeStyle;
     context.lineWidth = this.lineWidth;
+    context.font = this.labelFont;
 
     context.beginPath();
     context.moveTo(xAxisA.x, xAxisA.y);
@@ -309,6 +326,32 @@ export class Axis2D extends BasePrimitive {
     context.moveTo(yAxisA.x, yAxisA.y);
     context.lineTo(yAxisB.x, yAxisB.y);
     context.stroke();
+
+    for (let x = -this.extent; x <= this.extent; x += this.tickStep) {
+      if (Math.abs(x) < 1e-9) continue;
+      const p = camera.worldToScreen({ x, y: 0 }, width, height);
+      context.beginPath();
+      context.moveTo(p.x, p.y - this.tickSize);
+      context.lineTo(p.x, p.y + this.tickSize);
+      context.stroke();
+
+      if (this.showLabels) {
+        context.fillText(String(x), p.x - 6, p.y + 18);
+      }
+    }
+
+    for (let y = -this.extent; y <= this.extent; y += this.tickStep) {
+      if (Math.abs(y) < 1e-9) continue;
+      const p = camera.worldToScreen({ x: 0, y }, width, height);
+      context.beginPath();
+      context.moveTo(p.x - this.tickSize, p.y);
+      context.lineTo(p.x + this.tickSize, p.y);
+      context.stroke();
+
+      if (this.showLabels) {
+        context.fillText(String(y), p.x + 10, p.y + 4);
+      }
+    }
 
     context.restore();
   }
