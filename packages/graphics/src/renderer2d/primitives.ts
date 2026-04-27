@@ -83,6 +83,22 @@ export interface FunctionExpressionOptions extends Omit<FunctionGraph2DOptions, 
   expression: string;
 }
 
+function getVisibleWorldBounds(camera: Camera2D, width: number, height: number) {
+  const topLeft = camera.screenToWorld({ x: 0, y: 0 }, width, height);
+  const bottomRight = camera.screenToWorld({ x: width, y: height }, width, height);
+
+  return {
+    minX: Math.min(topLeft.x, bottomRight.x),
+    maxX: Math.max(topLeft.x, bottomRight.x),
+    minY: Math.min(topLeft.y, bottomRight.y),
+    maxY: Math.max(topLeft.y, bottomRight.y),
+  };
+}
+
+function snapStart(value: number, step: number): number {
+  return Math.floor(value / step) * step;
+}
+
 abstract class BasePrimitive implements Renderable {
   id: string;
   type: string;
@@ -237,29 +253,38 @@ export class Grid2D extends BasePrimitive {
     super("grid2d", options);
     this.step = options.step ?? 1;
     this.extent = options.extent ?? 20;
-    this.strokeStyle = options.strokeStyle ?? "#e5e7eb";
-    this.lineWidth = options.lineWidth ?? 1;
+    this.strokeStyle = options.strokeStyle ?? "#e8eaee";
+    this.lineWidth = options.lineWidth ?? 0.8;
   }
 
   render(context: CanvasRenderingContext2D, camera: Camera2D): void {
     if (!this.visible) return;
 
+    const width = context.canvas.width;
+    const height = context.canvas.height;
+    const bounds = getVisibleWorldBounds(camera, width, height);
+
+    const startX = snapStart(bounds.minX, this.step);
+    const endX = bounds.maxX;
+    const startY = snapStart(bounds.minY, this.step);
+    const endY = bounds.maxY;
+
     context.save();
     context.strokeStyle = this.strokeStyle;
     context.lineWidth = this.lineWidth;
 
-    for (let x = -this.extent; x <= this.extent; x += this.step) {
-      const a = camera.worldToScreen({ x, y: -this.extent }, context.canvas.width, context.canvas.height);
-      const b = camera.worldToScreen({ x, y: this.extent }, context.canvas.width, context.canvas.height);
+    for (let x = startX; x <= endX; x += this.step) {
+      const a = camera.worldToScreen({ x, y: bounds.minY }, width, height);
+      const b = camera.worldToScreen({ x, y: bounds.maxY }, width, height);
       context.beginPath();
       context.moveTo(a.x, a.y);
       context.lineTo(b.x, b.y);
       context.stroke();
     }
 
-    for (let y = -this.extent; y <= this.extent; y += this.step) {
-      const a = camera.worldToScreen({ x: -this.extent, y }, context.canvas.width, context.canvas.height);
-      const b = camera.worldToScreen({ x: this.extent, y }, context.canvas.width, context.canvas.height);
+    for (let y = startY; y <= endY; y += this.step) {
+      const a = camera.worldToScreen({ x: bounds.minX, y }, width, height);
+      const b = camera.worldToScreen({ x: bounds.maxX, y }, width, height);
       context.beginPath();
       context.moveTo(a.x, a.y);
       context.lineTo(b.x, b.y);
@@ -294,9 +319,9 @@ export class Axis2D extends BasePrimitive {
     super("axis2d", options);
     this.extent = options.extent ?? 20;
     this.tickStep = options.tickStep ?? 1;
-    this.tickSize = options.tickSize ?? 6;
+    this.tickSize = options.tickSize ?? 4;
     this.showLabels = options.showLabels ?? true;
-    this.labelFont = options.labelFont ?? "12px sans-serif";
+    this.labelFont = options.labelFont ?? "11px sans-serif";
     this.strokeStyle = options.strokeStyle ?? "#111827";
   }
 
@@ -305,51 +330,69 @@ export class Axis2D extends BasePrimitive {
 
     const width = context.canvas.width;
     const height = context.canvas.height;
+    const bounds = getVisibleWorldBounds(camera, width, height);
+    const majorEvery = 5;
 
-    const xAxisA = camera.worldToScreen({ x: -this.extent, y: 0 }, width, height);
-    const xAxisB = camera.worldToScreen({ x: this.extent, y: 0 }, width, height);
-    const yAxisA = camera.worldToScreen({ x: 0, y: -this.extent }, width, height);
-    const yAxisB = camera.worldToScreen({ x: 0, y: this.extent }, width, height);
+    const xAxisA = camera.worldToScreen({ x: bounds.minX, y: 0 }, width, height);
+    const xAxisB = camera.worldToScreen({ x: bounds.maxX, y: 0 }, width, height);
+    const yAxisA = camera.worldToScreen({ x: 0, y: bounds.minY }, width, height);
+    const yAxisB = camera.worldToScreen({ x: 0, y: bounds.maxY }, width, height);
 
     context.save();
     context.strokeStyle = this.strokeStyle;
-    context.fillStyle = this.strokeStyle;
-    context.lineWidth = this.lineWidth;
+    context.fillStyle = "#374151";
+    context.lineWidth = 2;
     context.font = this.labelFont;
 
-    context.beginPath();
-    context.moveTo(xAxisA.x, xAxisA.y);
-    context.lineTo(xAxisB.x, xAxisB.y);
-    context.stroke();
-
-    context.beginPath();
-    context.moveTo(yAxisA.x, yAxisA.y);
-    context.lineTo(yAxisB.x, yAxisB.y);
-    context.stroke();
-
-    for (let x = -this.extent; x <= this.extent; x += this.tickStep) {
-      if (Math.abs(x) < 1e-9) continue;
-      const p = camera.worldToScreen({ x, y: 0 }, width, height);
+    if (bounds.minY <= 0 && bounds.maxY >= 0) {
       context.beginPath();
-      context.moveTo(p.x, p.y - this.tickSize);
-      context.lineTo(p.x, p.y + this.tickSize);
+      context.moveTo(xAxisA.x, xAxisA.y);
+      context.lineTo(xAxisB.x, xAxisB.y);
+      context.stroke();
+    }
+
+    if (bounds.minX <= 0 && bounds.maxX >= 0) {
+      context.beginPath();
+      context.moveTo(yAxisA.x, yAxisA.y);
+      context.lineTo(yAxisB.x, yAxisB.y);
+      context.stroke();
+    }
+
+    const startX = snapStart(bounds.minX, this.tickStep);
+    for (let x = startX; x <= bounds.maxX; x += this.tickStep) {
+      if (Math.abs(x) < 1e-9 || !(bounds.minY <= 0 && bounds.maxY >= 0)) continue;
+      const p = camera.worldToScreen({ x, y: 0 }, width, height);
+      const roundedX = Math.round(x);
+      const isMajor = roundedX % majorEvery === 0;
+      const size = isMajor ? 7 : 4;
+
+      context.beginPath();
+      context.lineWidth = isMajor ? 1.5 : 1;
+      context.moveTo(p.x, p.y - size);
+      context.lineTo(p.x, p.y + size);
       context.stroke();
 
-      if (this.showLabels) {
-        context.fillText(String(x), p.x - 6, p.y + 18);
+      if (this.showLabels && isMajor) {
+        context.fillText(String(roundedX), p.x - 7, p.y + 18);
       }
     }
 
-    for (let y = -this.extent; y <= this.extent; y += this.tickStep) {
-      if (Math.abs(y) < 1e-9) continue;
+    const startY = snapStart(bounds.minY, this.tickStep);
+    for (let y = startY; y <= bounds.maxY; y += this.tickStep) {
+      if (Math.abs(y) < 1e-9 || !(bounds.minX <= 0 && bounds.maxX >= 0)) continue;
       const p = camera.worldToScreen({ x: 0, y }, width, height);
+      const roundedY = Math.round(y);
+      const isMajor = roundedY % majorEvery === 0;
+      const size = isMajor ? 7 : 4;
+
       context.beginPath();
-      context.moveTo(p.x - this.tickSize, p.y);
-      context.lineTo(p.x + this.tickSize, p.y);
+      context.lineWidth = isMajor ? 1.5 : 1;
+      context.moveTo(p.x - size, p.y);
+      context.lineTo(p.x + size, p.y);
       context.stroke();
 
-      if (this.showLabels) {
-        context.fillText(String(y), p.x + 10, p.y + 4);
+      if (this.showLabels && isMajor) {
+        context.fillText(String(roundedY), p.x + 10, p.y + 4);
       }
     }
 
