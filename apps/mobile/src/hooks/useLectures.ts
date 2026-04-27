@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CatalogService, HttpClient, MemoryTokenStorage } from "@vm/integration";
+import { CatalogService, HttpClient } from "@vm/integration";
+import { mobileTokenStorage } from "../auth/tokenStorage";
 import type { LectureSummary } from "@vm/shared";
 import { API_BASE_URL } from "../api/endpoints";
 
@@ -13,8 +14,6 @@ export function useLectures() {
   const [error, setError] = useState<string | null>(null);
 
   const catalogService = useMemo(() => {
-    const tokenStorage = new MemoryTokenStorage();
-
     const http = new HttpClient(
       {
         baseUrl: API_BASE_URL,
@@ -22,7 +21,7 @@ export function useLectures() {
         maxRetries: 2,
       },
       {
-        getAccessToken: () => tokenStorage.get().then((tokens) => tokens?.accessToken ?? null),
+        getAccessToken: () => mobileTokenStorage.get().then((tokens) => tokens?.accessToken ?? null),
       },
     );
 
