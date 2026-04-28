@@ -7,3 +7,5 @@ export * from "./serialize/schema.js";
 export * from "./serialize/objectFactory.js";
 export * from "./demo/demo2d.js";
 export * from "./renderer3d/webglRenderer.js";
+
+export * from "./analysis/index.js";
