@@ -1,3 +1,4 @@
+export * from "./classify.js";
 export * from "./ast.js";
 export * from "./tokenize.js";
 export * from "./parse.js";
